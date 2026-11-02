@@ -1,106 +1,143 @@
 using UnityEngine; // 引入 Unity 基本功能。
+using UnityEngine.AI; // 引入 NavMeshAgent 導航功能。
 
 public class Move : MonoBehaviour
 {
-    [Header("移動設定")]
+    // ==========================================
+    // NavMesh Agent
+    // ==========================================
 
-    public float moveSpeed = 3f; // 玩家每秒移動速度。
+    [Header("NavMesh")]
 
-    public float stopDistance = 0.05f; // 距離目標多近時停止。
-
-
-    private Vector3 targetPosition; // 玩家目前的移動目標。
-
-    private bool hasTarget = false; // 玩家現在是否有目標。
-
-    private bool canMove = true; // 玩家目前是否允許移動。
+    public NavMeshAgent agent;
+    // 玩家身上的 NavMeshAgent。
+    // 負責實際尋路與移動。
 
 
-    private void Update()
+    // ==========================================
+    // 移動狀態
+    // ==========================================
+
+    private bool canMove = true;
+    // 紀錄目前是否允許玩家移動。
+
+
+    private void Awake()
     {
-        // 如果目前禁止移動，就不執行後面的移動。
-        if (!canMove)
+        // 如果 Inspector 沒有手動指定 NavMeshAgent。
+        if (agent == null)
         {
-            return;
-        }
-
-
-        // 如果目前有移動目標。
-        if (hasTarget)
-        {
-            // 執行移動。
-            MovePlayer();
+            // 自動取得同一個 GameObject 上的 NavMeshAgent。
+            agent = GetComponent<NavMeshAgent>();
         }
     }
 
 
-    // GameManager 會呼叫這個函式，
-    // 告訴玩家要走去哪裡。
+    // ==========================================
+    // 設定玩家移動目的地
+    // ==========================================
+
     public void SetTargetPosition(Vector3 position)
     {
-        // 儲存新的目標位置。
-        targetPosition = position;
-
-        // 目前地板是平面的，所以保留玩家原本的 Y。
-        targetPosition.y = transform.position.y;
-
-        // 表示現在有一個目標。
-        hasTarget = true;
-    }
-
-
-    private void MovePlayer()
-    {
-        // 計算玩家和目標位置之間的距離。
-        float distance = Vector3.Distance(
-            transform.position,
-            targetPosition
-        );
-
-
-        // 如果已經到達目標附近。
-        if (distance <= stopDistance)
+        // 如果現在不允許玩家移動。
+        if (!canMove)
         {
-            // 將玩家放到目標位置。
-            transform.position = targetPosition;
-
-            // 清除目前目標。
-            hasTarget = false;
-
-            // 結束這次執行。
+            // 就不設定新的目的地。
             return;
         }
 
 
-        // 玩家往目標位置移動。
-        transform.position = Vector3.MoveTowards(
-            transform.position,
-            targetPosition,
-            moveSpeed * Time.deltaTime
-        );
+        // 如果沒有找到 NavMeshAgent。
+        if (agent == null)
+        {
+            // 顯示錯誤訊息。
+            Debug.LogError("Move 找不到 NavMeshAgent。");
+
+            // 不繼續執行。
+            return;
+        }
+
+
+        // 如果 Agent 目前沒有位於 NavMesh 上。
+        if (!agent.isOnNavMesh)
+        {
+            // 顯示錯誤訊息。
+            Debug.LogWarning("玩家目前不在 NavMesh 上。");
+
+            // 不設定目的地。
+            return;
+        }
+
+
+        // 告訴 NavMeshAgent：
+        // 玩家要移動到這個位置。
+        agent.SetDestination(position);
     }
 
 
-    // GameManager 使用這個函式控制玩家是否可以移動。
+    // ==========================================
+    // 開啟／關閉玩家移動
+    // ==========================================
+
     public void SetMovementEnabled(bool enabled)
     {
-        // 更新移動狀態。
+        // 更新目前是否允許移動。
         canMove = enabled;
+
+
+        // 如果沒有 NavMeshAgent。
+        if (agent == null)
+        {
+            // 不執行後續內容。
+            return;
+        }
+
+
+        // 如果 Agent 目前不在 NavMesh 上。
+        if (!agent.isOnNavMesh)
+        {
+            // 不操作 Agent。
+            return;
+        }
 
 
         // 如果現在禁止移動。
         if (!enabled)
         {
-            // 取消目前的移動目標。
+            // 立即停止目前的移動路徑。
             StopMoving();
         }
+
+
+        // 如果允許移動，
+        // 不需要特別啟動 Agent。
+        // 下一次 SetTargetPosition() 時就會重新尋路。
     }
 
 
-    // 強制玩家停止。
+    // ==========================================
+    // 停止目前移動
+    // ==========================================
+
     public void StopMoving()
     {
-        // 清除目前目標。
-        hasTarget = false;
+        // 如果沒有 NavMeshAgent。
+        if (agent == null)
+        {
+            // 不執行。
+            return;
+        }
+
+
+        // 如果 Agent 目前不在 NavMesh 上。
+        if (!agent.isOnNavMesh)
+        {
+            // 不執行。
+            return;
+        }
+
+
+        // 清除目前正在走的路徑。
+        agent.ResetPath();
     }
 }

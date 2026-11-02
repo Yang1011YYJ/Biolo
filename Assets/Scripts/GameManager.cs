@@ -10,10 +10,12 @@ public class GameManager : MonoBehaviour
 
     public enum GameState
     {
-        PreStart,   // 還在開始畫面，遊戲尚未正式開始。
-        Intro,      // 開場劇情。
-        Exploring,  // 玩家可以自由移動。
-        Computer    // 玩家正在操作電腦。
+        PreStart,        // 遊戲尚未正式開始。
+        Intro,           // 開場劇情。
+        Exploring,       // 玩家自由探索。
+        Computer,        // 玩家正在操作電腦。
+        MissionDialogue, // 任務相關對話。
+        SignInfo         // 玩家正在查看場景中的牌子資訊。
     }
 
 
@@ -32,8 +34,6 @@ public class GameManager : MonoBehaviour
 
 
     [Header("介面")]
-
-    public GameObject introDialoguePanel; // 開場劇情對話框。
     public GameObject computerPanel; // 電腦介面。
     public GameObject BlackPanel;
     public Button startButton;
@@ -42,12 +42,11 @@ public class GameManager : MonoBehaviour
     [Tooltip("場景中的電腦設備")]public GameObject computerObject;
 
     [Header("教材進度")]
-    [Tooltip("玩家是否已經查看並確認第一個實習任務")]
-    public bool missionAccepted = false; // 紀錄玩家是否已經接下任務。
-    public TextMeshProUGUI AcceptMissionState;
 
     [Header("腳本")]
     public FadeController fadeController;
+    public MissionController missionController; // 控制任務流程。
+    public DialogueControll dialogueControll;// 控制共用對話框的顯示與句子推進。
 
 
     private void Start()
@@ -56,9 +55,9 @@ public class GameManager : MonoBehaviour
         Debug.unityLogger.logEnabled = true;
 
         // 測試三種訊息。
-        Debug.Log("GameManager Log");
-        Debug.LogWarning("GameManager Warning");
-        Debug.LogError("GameManager Error");
+        //Debug.Log("GameManager Log");
+        //Debug.LogWarning("GameManager Warning");
+        //Debug.LogError("GameManager Error");
 
         // 遊戲一開始先隱藏玩家。
         playerVisual.SetActive(false);
@@ -66,15 +65,8 @@ public class GameManager : MonoBehaviour
         // 遊戲一開始先隱藏場景中的電腦設備。
         computerObject.SetActive(false);
 
-        //未接受任何任務
-        AcceptMissionState.text = "未接受";
-        AcceptMissionState.color = new Color(0.4792453f, 0.4792453f, 0.4792453f,1);
-
         // 關閉黑幕。
         BlackPanel.SetActive(false);
-
-        // 關閉開場對話框。
-        introDialoguePanel.SetActive(false);
 
         // 關閉電腦介面。
         computerPanel.SetActive(false);
@@ -86,7 +78,7 @@ public class GameManager : MonoBehaviour
     private void StartGame()
     {
         // 測試 StartGame 是否真的有被執行。
-        Debug.LogError("★★★ StartGame 有執行 ★★★");
+        //Debug.LogError("★★★ StartGame 有執行 ★★★");
 
         // 將玩家移動到遊戲開始位置。
         player.position = startPosition;
@@ -97,19 +89,19 @@ public class GameManager : MonoBehaviour
         // 顯示場景中的電腦。
         computerObject.SetActive(true);
 
-        // 顯示目前 GameManager 指到的是哪一個物件。
-        Debug.LogError("電腦物件名稱：" + computerObject.name);
+        //// 顯示目前 GameManager 指到的是哪一個物件。
+        //Debug.LogError("電腦物件名稱：" + computerObject.name);
 
-        // 檢查電腦自己是否被啟用。
-        Debug.LogError("activeSelf：" + computerObject.activeSelf);
+        //// 檢查電腦自己是否被啟用。
+        //Debug.LogError("activeSelf：" + computerObject.activeSelf);
 
-        // 檢查電腦在整個 Hierarchy 中是否真的有效。
-        Debug.LogError("activeInHierarchy：" + computerObject.activeInHierarchy);
+        //// 檢查電腦在整個 Hierarchy 中是否真的有效。
+        //Debug.LogError("activeInHierarchy：" + computerObject.activeInHierarchy);
     }
 
     public void StartButton()
     {
-        Debug.LogError("★★★ 現在執行的是 GameManager.StartButton ★★★");
+        //Debug.LogError("★★★ 現在執行的是 GameManager.StartButton ★★★");
 
         if (currentState == GameState.PreStart)
         {
@@ -148,22 +140,40 @@ public class GameManager : MonoBehaviour
 
     public void StartIntro()
     {
-        // 顯示開場劇情對話框。
-        introDialoguePanel.SetActive(true);
-
-        // 正式進入開場劇情狀態。
+        // 將整體流程切換成開場劇情狀態。
         SetState(GameState.Intro);
+
+
+        // 使用共用對話系統播放開場內容。
+        dialogueControll.OpenDialogue(
+            "", // 如果開場沒有特定說話者，名稱可以先留空。
+
+            null, // 如果開場沒有角色圖片，可以先不指定。
+
+            new string[]
+            {
+            // 第一段開場內容。
+            "歡迎來到研究中心。",
+
+            // 第二段開場內容。
+            "今天開始，你將以實習生的身分參與研究工作。",
+
+            // 第三段開場內容。
+            "先到研究室的電腦看看今天的實習任務吧。"
+            },
+
+            OnIntroDialogueFinished
+        // 整段開場對話播放完成後，
+        // 自動執行這個函式。
+        );
     }
 
 
-    // 這個函式給開場對話框的 Button 呼叫。
-    public void CloseIntro()
+    private void OnIntroDialogueFinished()
     {
-        // 關閉開場對話框。
-        introDialoguePanel.SetActive(false);
-
-        // 進入自由探索狀態。
-        SetState(GameState.Exploring);
+        // 開場劇情全部播放完成後，
+        // 才正式讓玩家進入自由探索。
+        ReturnToExploring();
     }
 
 
@@ -220,28 +230,28 @@ public class GameManager : MonoBehaviour
     // 這個函式給電腦 Panel 的關閉按鈕呼叫。
     public void CloseComputer()
     {
-        // 關閉電腦 Panel。
+        // 關閉電腦介面。
         computerPanel.SetActive(false);
 
-        // 回到自由探索狀態。
-        SetState(GameState.Exploring);
-    }
 
-    // ==========================================
-    // 確認實習任務
-    // ==========================================
+        // 通知 MissionController：
+        // 玩家剛剛把電腦關掉了。
+        bool missionDialogueStarted =
+            missionController.OnComputerClosed();
 
-    public void AcceptMission()
-    {
-        //接受任務
-        AcceptMissionState.text = "已接受";
-        AcceptMissionState.color = new Color(0, 0.8415094f, 5.015787e-08f, 1);
 
-        // 標記玩家已經查看並確認任務。
-        missionAccepted = true;
+        // 如果 MissionController 已經開啟任務對話，
+        // 就不要把玩家切回自由探索。
+        if (missionDialogueStarted)
+        {
+            // 任務對話會自己維持 MissionDialogue 狀態。
+            return;
+        }
 
-        // 測試用訊息，之後可以刪除。
-        Debug.Log("玩家已確認實習任務。");
+
+        // 如果這次沒有任何任務劇情，
+        // 就正常回到自由探索。
+        ReturnToExploring();
     }
 
 
@@ -275,5 +285,61 @@ public class GameManager : MonoBehaviour
     {
         // 只有自由探索時可以點場景。
         return currentState == GameState.Exploring;
+    }
+
+
+    // ==========================================
+    // 任務對話狀態
+    // ==========================================
+
+    public void EnterMissionDialogue()
+    {
+        // 進入任務對話狀態。
+        SetState(GameState.MissionDialogue);
+    }
+
+
+    // ==========================================
+    // 回到自由探索
+    // ==========================================
+
+    public void ReturnToExploring()
+    {
+        // 回到自由探索狀態。
+        SetState(GameState.Exploring);
+    }
+
+
+    // ==========================================
+    // 溫室互動
+    // ==========================================
+
+    public void TryInteractGreenhouse(
+        GreenhouseController greenhouse,
+        GameObject clickedObject)
+    {
+        // 只有玩家正在自由探索時，
+        // 才允許和溫室中的物件互動。
+        if (currentState != GameState.Exploring)
+        {
+            // 如果現在不是自由探索，就直接停止。
+            return;
+        }
+
+
+        // 讓GreenhouseController判斷：
+        // 點到的物件是不是牌子，而且玩家距離是否足夠。
+        bool signOpened = greenhouse.TryOpenSign(
+            clickedObject, // 玩家實際點擊到的物件。
+            player // 玩家本身的Transform。
+        );
+
+
+        // 如果真的成功開啟牌子資訊。
+        if (signOpened)
+        {
+            // 把整體操作狀態切換成牌子資訊。
+            SetState(GameState.SignInfo);
+        }
     }
 }

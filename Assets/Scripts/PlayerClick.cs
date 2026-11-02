@@ -20,6 +20,9 @@ public class PlayerClick : MonoBehaviour
 
     public LayerMask interactableLayer; // 可以互動的場景物件。
 
+    [Header("腳本")]
+    public GreenhouseController greenhouseController;
+
 
     private void Start()
     {
@@ -105,6 +108,24 @@ public class PlayerClick : MonoBehaviour
                 gameManager.TryOpenComputer(computer);
 
                 // 互動完成，不再判斷地板。
+                return;
+            }
+
+            // 嘗試從被點擊物件的父物件中，
+            // 找到GreenhouseController。
+            GreenhouseController greenhouse =
+                hit.collider.GetComponentInParent<GreenhouseController>();
+
+
+            // 確認溫室控制腳本是否有指定。
+            if (greenhouseController != null)
+            {
+                // 將點擊的物件交給溫室控制腳本判斷。
+                gameManager.TryInteractGreenhouse(
+                    greenhouseController,
+                    hit.collider.gameObject
+                );
+
                 return;
             }
         }
