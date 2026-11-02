@@ -68,7 +68,8 @@ public class MissionController : MonoBehaviour
     // 控制假設選擇介面。
     public ResearchRecordController researchRecordController;
     // 儲存玩家的研究紀錄。
-
+    public MissionHintController missionHintController;
+    // 負責顯示目前的任務提示。
 
     // ==========================================
     // 初始化
@@ -200,7 +201,7 @@ public class MissionController : MonoBehaviour
         if (currentMissionStep == MissionStep.ReadMission)
         {
             // 將任務推進到「前往溫室」。
-            currentMissionStep = MissionStep.GoToGreenhouse;
+            SetMissionStep(MissionStep.GoToGreenhouse);
 
 
             // 測試目前任務進度。
@@ -224,7 +225,7 @@ public class MissionController : MonoBehaviour
         {
             // 代表玩家已經成功抵達，
             // 並開始查看親代資料。
-            currentMissionStep = MissionStep.ObserveParents;
+            SetMissionStep(MissionStep.ObserveParents);
 
 
             // 測試目前任務進度。
@@ -249,7 +250,7 @@ public class MissionController : MonoBehaviour
         }
 
         // 更新任務進度。
-        currentMissionStep = MissionStep.MakeHypothesis;
+        SetMissionStep(MissionStep.MakeHypothesis);
 
         // 進入任務對話狀態。
         gameManager.EnterMissionDialogue();
@@ -322,7 +323,7 @@ public class MissionController : MonoBehaviour
     private void OnHypothesisDialogueFinished()
     {
         // 更新任務進度。
-        currentMissionStep = MissionStep.RecordHypothesis;
+        SetMissionStep(MissionStep.RecordHypothesis);
 
         // 對話結束，恢復玩家移動。
         gameManager.ReturnToExploring();
@@ -335,5 +336,136 @@ public class MissionController : MonoBehaviour
     // 親代觀察完成對話結束
     // ==========================================
 
-    
+    // ==========================================
+    // 更新目前任務階段
+    // ==========================================
+
+    private void SetMissionStep(MissionStep newStep)
+    {
+        // 更新目前的任務階段。
+        currentMissionStep = newStep;
+
+
+        // 同步更新畫面上的任務提示。
+        UpdateMissionHint();
+    }
+
+    // ==========================================
+    // 更新任務提示文字
+    // ==========================================
+
+    private void UpdateMissionHint()
+    {
+        // 根據目前任務階段，
+        // 決定玩家畫面上應該看到什麼提示。
+        switch (currentMissionStep)
+        {
+            // ======================================
+            // 查看實習任務
+            // ======================================
+
+            case MissionStep.ReadMission:
+
+                // 告訴玩家先去操作研究室電腦。
+                missionHintController.ShowHint(
+                    "前往研究室電腦查看任務"
+                );
+
+                break;
+
+
+            // ======================================
+            // 前往溫室
+            // ======================================
+
+            case MissionStep.GoToGreenhouse:
+
+                // 提醒玩家前往溫室。
+                missionHintController.ShowHint(
+                    "前往溫室查看兩株豌豆"
+                );
+
+                break;
+
+
+            // ======================================
+            // 觀察親代
+            // ======================================
+
+            case MissionStep.ObserveParents:
+
+                // 提醒玩家兩株親代都需要查看。
+                missionHintController.ShowHint(
+                    "查看高莖與矮莖親代的牌子"
+                );
+
+                break;
+
+
+            // ======================================
+            // 提出假設
+            // ======================================
+
+            case MissionStep.MakeHypothesis:
+
+                // 提醒玩家根據剛才的資訊提出假設。
+                missionHintController.ShowHint(
+                    "提出假設"
+                );
+
+                break;
+
+
+            // ======================================
+            // 紀錄假設
+            // ======================================
+
+            case MissionStep.RecordHypothesis:
+
+                // 提醒玩家回到研究室電腦。
+                missionHintController.ShowHint(
+                    "前往研究室電腦記錄假設"
+                );
+
+                break;
+
+
+            // ======================================
+            // 取得紀錄板
+            // ======================================
+
+            case MissionStep.GetClipboard:
+
+                // 提醒玩家取得等等實驗會使用的紀錄板。
+                missionHintController.ShowHint(
+                    "取得實驗紀錄板"
+                );
+
+                break;
+
+
+            // ======================================
+            // 準備開始實驗
+            // ======================================
+
+            case MissionStep.ReadyForExperiment:
+
+                // 告訴玩家已經可以正式開始實驗。
+                missionHintController.ShowHint(
+                    "前往溫室進行實驗"
+                );
+
+                break;
+        }
+    }
+
+    // ==========================================
+    // 第一次顯示目前任務
+    // ==========================================
+
+    public void ShowCurrentMissionHint()
+    {
+        // 顯示目前任務階段所對應的提示。
+        UpdateMissionHint();
+    }
 }

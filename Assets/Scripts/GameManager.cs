@@ -175,8 +175,12 @@ public class GameManager : MonoBehaviour
     private void OnIntroDialogueFinished()
     {
         // 開場劇情全部播放完成後，
-        // 才正式讓玩家進入自由探索。
+        // 正式讓玩家進入自由探索。
         ReturnToExploring();
+
+
+        // 顯示第一個正式任務提示。
+        missionController.ShowCurrentMissionHint();
     }
 
 
