@@ -89,6 +89,9 @@ public class GameManager : MonoBehaviour
         // 顯示場景中的電腦。
         computerObject.SetActive(true);
 
+        //關閉開始按鈕
+        startButton.gameObject.SetActive(false);
+
         //// 顯示目前 GameManager 指到的是哪一個物件。
         //Debug.LogError("電腦物件名稱：" + computerObject.name);
 

@@ -9,10 +9,13 @@ public class MissionController : MonoBehaviour
 
     public enum MissionStep
     {
-        ReadMission,         // 玩家目前要查看並接受電腦中的實習任務。
-        GoToGreenhouse,      // 玩家接下來要前往溫室。
-        ObserveParents,      // 玩家正在觀察兩株親代。
-        ReadyForHypothesis   // 親代觀察完成，準備提出假設。
+        ReadMission,         // 查看電腦中的實習任務。
+        GoToGreenhouse,      // 前往溫室。
+        ObserveParents,      // 觀察兩株親代。
+        MakeHypothesis,      // 提出假設。
+        RecordHypothesis,    // 回電腦紀錄假設。
+        GetClipboard,        // 取得實驗紀錄板。
+        ReadyForExperiment   // 準備開始實驗。
     }
 
 
@@ -59,6 +62,12 @@ public class MissionController : MonoBehaviour
 
     public GameObject teacherVisual;
     // 指導老師的角色圖片或角色物件。
+
+    [Header("腳本")]
+    public HypothesisController hypothesisController;
+    // 控制假設選擇介面。
+    public ResearchRecordController researchRecordController;
+    // 儲存玩家的研究紀錄。
 
 
     // ==========================================
@@ -203,4 +212,128 @@ public class MissionController : MonoBehaviour
         // 回到自由探索狀態。
         gameManager.ReturnToExploring();
     }
+
+    // ==========================================
+    // 玩家開始查看親代
+    // ==========================================
+
+    public void OnParentSignViewed()
+    {
+        // 如果目前任務是「前往溫室」。
+        if (currentMissionStep == MissionStep.GoToGreenhouse)
+        {
+            // 代表玩家已經成功抵達，
+            // 並開始查看親代資料。
+            currentMissionStep = MissionStep.ObserveParents;
+
+
+            // 測試目前任務進度。
+            Debug.Log("任務進度：觀察親代。");
+        }
+    }
+
+    // ==========================================
+    // 兩株親代觀察完成
+    // ==========================================
+
+    // ==========================================
+    // 兩株親代觀察完成
+    // ==========================================
+
+    public bool OnParentsObserved()
+    {
+        // 只有在觀察親代階段才能進入假設。
+        if (currentMissionStep != MissionStep.ObserveParents)
+        {
+            return false;
+        }
+
+        // 更新任務進度。
+        currentMissionStep = MissionStep.MakeHypothesis;
+
+        // 進入任務對話狀態。
+        gameManager.EnterMissionDialogue();
+
+        // 播放指導老師的提問。
+        dialogueControll.OpenDialogue(
+            "指導老師",
+
+            teacherVisual,
+
+            new string[]
+            {
+            "根據你剛才觀察到的兩株親代，你認為高莖和矮莖，哪一種性狀可能是顯性的？"
+            },
+
+            OnHypothesisPromptFinished
+        );
+
+        return true;
+    }
+
+
+    // ==========================================
+    // 老師提問結束
+    // ==========================================
+
+    private void OnHypothesisPromptFinished()
+    {
+        // 開啟假設選擇介面。
+        hypothesisController.OpenPanel();
+    }
+
+
+    // ==========================================
+    // 玩家確認假設
+    // ==========================================
+
+    public void OnHypothesisConfirmed(
+        ResearchRecordController.HypothesisType hypothesis)
+    {
+        // 確認目前任務確實處於假設階段。
+        if (currentMissionStep != MissionStep.MakeHypothesis)
+        {
+            return;
+        }
+
+        // 將玩家的假設交給研究紀錄系統儲存。
+        researchRecordController.SaveHypothesis(hypothesis);
+
+        // 播放老師接下來的指示。
+        dialogueControll.OpenDialogue(
+            "指導老師",
+
+            teacherVisual,
+
+            new string[]
+            {
+            "好，先把這個想法記下來。請回研究室的電腦，將你的假設正式記錄下來，並取得實驗紀錄板。完成後，我們就可以開始交配實驗了。"
+            },
+
+            OnHypothesisDialogueFinished
+        );
+    }
+
+
+    // ==========================================
+    // 假設對話結束
+    // ==========================================
+
+    private void OnHypothesisDialogueFinished()
+    {
+        // 更新任務進度。
+        currentMissionStep = MissionStep.RecordHypothesis;
+
+        // 對話結束，恢復玩家移動。
+        gameManager.ReturnToExploring();
+
+        // 顯示測試訊息。
+        Debug.Log("任務進度：回研究室紀錄假設。");
+    }
+
+    // ==========================================
+    // 親代觀察完成對話結束
+    // ==========================================
+
+    
 }
