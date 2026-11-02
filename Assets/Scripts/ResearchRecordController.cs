@@ -19,6 +19,9 @@ public class ResearchRecordController : MonoBehaviour
     [SerializeField]
     private HypothesisType currentHypothesis = HypothesisType.None;
     // 儲存玩家目前提出的假設。
+    [Tooltip("假設紀錄狀態")][SerializeField]private bool hypothesisRecorded = false;
+    // 紀錄玩家是否已經回到電腦，
+    // 將先前提出的假設正式寫入實驗報告。
 
 
     // ==========================================
@@ -79,5 +82,41 @@ public class ResearchRecordController : MonoBehaviour
             default:
                 return "尚未提出假設";
         }
+    }
+
+    // ==========================================
+    // 確認假設是否已正式記錄
+    // ==========================================
+
+    public bool IsHypothesisRecorded()
+    {
+        // 回傳目前是否已經完成正式紀錄。
+        return hypothesisRecorded;
+    }
+
+
+    // ==========================================
+    // 正式記錄假設
+    // ==========================================
+
+    public void RecordHypothesis()
+    {
+        // 如果玩家根本還沒有提出假設。
+        if (!HasHypothesis())
+        {
+            // 就不能進行正式紀錄。
+            return;
+        }
+
+
+        // 標記這份假設已經正式寫入研究紀錄。
+        hypothesisRecorded = true;
+
+
+        // 測試用訊息。
+        Debug.Log(
+            "假設已正式記錄：" +
+            GetHypothesisDescription()
+        );
     }
 }

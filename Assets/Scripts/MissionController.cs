@@ -1,5 +1,6 @@
 using TMPro; // 引入 TextMeshPro，用來修改任務接受狀態文字。
-using UnityEngine; // 引入 Unity 基本功能。
+using UnityEngine;
+using UnityEngine.UI; // 引入 Unity 基本功能。
 
 public class MissionController : MonoBehaviour
 {
@@ -24,6 +25,10 @@ public class MissionController : MonoBehaviour
     public MissionStep currentMissionStep = MissionStep.ReadMission;
     // 遊戲開始時，第一個任務階段是查看電腦。
 
+
+    [Header("UI")]
+    public Button acceptMissionButton;
+    // 電腦中用來接受實習任務的按鈕。
 
     // ==========================================
     // 任務接受狀態
@@ -84,6 +89,10 @@ public class MissionController : MonoBehaviour
         // 顯示「未接受」。
         AcceptMissionState.text = "未接受";
 
+        // 遊戲一開始任務尚未接受，
+        // 所以接受任務按鈕可以使用。
+        acceptMissionButton.interactable = true;
+
 
         // 將未接受狀態設定成灰色。
         AcceptMissionState.color =
@@ -127,6 +136,10 @@ public class MissionController : MonoBehaviour
                 1f
             );
 
+        
+        // 任務一旦接受，
+        // 這個按鈕就不能再按。
+        acceptMissionButton.interactable = false;
 
         // 測試目前狀態。
         Debug.Log("玩家已確認實習任務。");
@@ -467,5 +480,40 @@ public class MissionController : MonoBehaviour
     {
         // 顯示目前任務階段所對應的提示。
         UpdateMissionHint();
+    }
+
+    // ==========================================
+    // 是否可以正式記錄假設
+    // ==========================================
+
+    public bool CanRecordHypothesis()
+    {
+        // 只有目前任務是 RecordHypothesis，
+        // 才允許玩家正式紀錄。
+        return currentMissionStep == MissionStep.RecordHypothesis;
+    }
+
+
+    // ==========================================
+    // 假設正式記錄完成
+    // ==========================================
+
+    public void OnHypothesisRecorded()
+    {
+        // 確認目前真的處於記錄假設階段。
+        if (currentMissionStep != MissionStep.RecordHypothesis)
+        {
+            // 如果不是，就不推進任務。
+            return;
+        }
+
+
+        // 假設已完成正式記錄，
+        // 下一步改成取得實驗紀錄板。
+        SetMissionStep(MissionStep.GetClipboard);
+
+
+        // 測試用訊息。
+        Debug.Log("任務進度：取得實驗紀錄板。");
     }
 }
