@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e03f1ed67f6c2bb4c87b047fd70f9e50, type: 3}
+  m_Name: ExperimentClipboard
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemID: 1
+  itemName: "\u5BE6\u9A57\u7D00\u9304\u677F"
+  itemDescription: "\u7528\u4F86\u8A18\u9304\u5BE6\u9A57\u5047\u8A2D\u8207\u5BE6\u9A57\u7D50\u679C\u3002"
+  itemImage: {fileID: 7838702061490052015, guid: 27f914c872fc3ce409695e54d64d6216, type: 3}
+  isUsable: 1
+  useType: 0
+  useButtonLabel: "\u67E5\u770B"
+  openPanelPrefab: {fileID: 4045549303480248922, guid: c3ba81b96f6c24b47ab18ed1d033743a, type: 3}
+  isDeletable: 0

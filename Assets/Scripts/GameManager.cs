@@ -15,7 +15,8 @@ public class GameManager : MonoBehaviour
         Exploring,       // 玩家自由探索。
         Computer,        // 玩家正在操作電腦。
         MissionDialogue, // 任務相關對話。
-        SignInfo         // 玩家正在查看場景中的牌子資訊。
+        SignInfo,         // 玩家正在查看場景中的牌子資訊。
+        Inventory        // 玩家正在操作背包。
     }
 
 
@@ -37,6 +38,7 @@ public class GameManager : MonoBehaviour
     public GameObject computerPanel; // 電腦介面。
     public GameObject BlackPanel;
     public Button startButton;
+    [Tooltip("背包介面UI")] public GameObject BackpackPanel;
 
     [Header("場景中的設備")]
     [Tooltip("場景中的電腦設備")]public GameObject computerObject;
@@ -70,6 +72,9 @@ public class GameManager : MonoBehaviour
 
         // 關閉電腦介面。
         computerPanel.SetActive(false);
+
+        //關閉背包介面。
+        BackpackPanel.SetActive(false);
 
         // 設定初始狀態。
         SetState(GameState.PreStart);
@@ -314,6 +319,16 @@ public class GameManager : MonoBehaviour
     {
         // 回到自由探索狀態。
         SetState(GameState.Exploring);
+    }
+
+    // ==========================================
+    // 背包狀態
+    // ==========================================
+
+    public void EnterInventory()
+    {
+        // 進入背包操作狀態。
+        SetState(GameState.Inventory);
     }
 
 

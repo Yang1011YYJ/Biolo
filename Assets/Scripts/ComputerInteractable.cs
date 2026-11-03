@@ -19,6 +19,10 @@ public class ComputerInteractable : MonoBehaviour
     [Tooltip("實驗報告按鈕所對應的內容")]
     public GameObject reportContent; // 顯示實驗報告的區域。
 
+    [Header("腳本")]
+    public ExperimentReportController experimentReportController;
+    // 控制實驗報告內容。
+
 
     // ==========================================
     // 玩家距離判斷
@@ -74,10 +78,35 @@ public class ComputerInteractable : MonoBehaviour
     // 顯示實驗報告
     // ==========================================
 
+    // ==========================================
+    // 顯示實驗報告頁面
+    // ==========================================
+
     public void ShowReportContent()
     {
-        // 顯示實驗報告內容。
-        ShowContent(reportContent);
+        // 先關閉其他電腦內容。
+        HideAllContent();
+
+        // 開啟實驗報告內容。
+        reportContent.SetActive(true);
+
+        // 如果有指定實驗報告控制器。
+        if (experimentReportController != null)
+        {
+            // 每次玩家打開實驗報告，
+            // 都強制重新讀取目前的研究資料。
+            experimentReportController.RefreshReport();
+
+            // 測試目前是否真的有執行刷新。
+            Debug.Log("已重新整理實驗報告。");
+        }
+        else
+        {
+            // 如果沒有指定，就提醒我們 Inspector 漏接。
+            Debug.LogError(
+                "ComputerInteractable 尚未指定 ExperimentReportController。"
+            );
+        }
     }
 
 

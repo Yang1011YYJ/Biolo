@@ -516,4 +516,38 @@ public class MissionController : MonoBehaviour
         // 測試用訊息。
         Debug.Log("任務進度：取得實驗紀錄板。");
     }
+
+    // ==========================================
+    // 判斷目前是否可以取得實驗紀錄板
+    // ==========================================
+
+    public bool CanGetClipboard()
+    {
+        // 只有任務進度來到 GetClipboard 時，
+        // 才允許玩家取得紀錄板。
+        return currentMissionStep == MissionStep.GetClipboard;
+    }
+
+
+    // ==========================================
+    // 玩家成功取得實驗紀錄板
+    // ==========================================
+
+    public void OnClipboardObtained()
+    {
+        // 如果目前不是取得紀錄板的任務階段，
+        // 就不執行。
+        if (!CanGetClipboard())
+        {
+            return;
+        }
+
+        // 將任務推進到「準備進行實驗」。
+        SetMissionStep(MissionStep.ReadyForExperiment);
+
+        // 顯示測試訊息。
+        Debug.Log(
+            "玩家已取得實驗紀錄板，任務進入 ReadyForExperiment。"
+        );
+    }
 }
