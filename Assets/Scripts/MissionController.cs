@@ -25,7 +25,6 @@ public class MissionController : MonoBehaviour
     public MissionStep currentMissionStep = MissionStep.ReadMission;
     // 遊戲開始時，第一個任務階段是查看電腦。
 
-
     [Header("UI")]
     public Button acceptMissionButton;
     // 電腦中用來接受實習任務的按鈕。
@@ -39,20 +38,22 @@ public class MissionController : MonoBehaviour
     [Tooltip("玩家是否已經查看並確認第一個實習任務")]
     public bool missionAccepted = false;
     // 紀錄玩家是否已經接受目前的實習任務。
-
-
     public TextMeshProUGUI AcceptMissionState;
     // 電腦中顯示「未接受／已接受」的文字。
 
-
     // ==========================================
-    // 主程式
+    // 任務目標指示
     // ==========================================
 
-    [Header("主程式")]
-
-    public GameManager gameManager;
-    // 整個教材的全域流程控制程式。
+    [Header("任務目標指示")]
+    public Transform computerTarget;
+    // 研究室電腦的位置。
+    public Transform greenhouseTarget;
+    // 溫室入口或溫室中心的位置。
+    public Transform clipboardTarget;
+    // 場景中的實驗紀錄板位置。
+    public Transform experimentTarget;
+    // 正式進行交配實驗的位置。
 
 
     // ==========================================
@@ -60,21 +61,22 @@ public class MissionController : MonoBehaviour
     // ==========================================
 
     [Header("對話系統")]
-
-    public DialogueControll dialogueControll;
-    // 共用的對話系統。
-
-
     public GameObject teacherVisual;
     // 指導老師的角色圖片或角色物件。
 
     [Header("腳本")]
+    public MissionTargetIndicator missionTargetIndicator;
+    // 控制目前任務目標上方的指示圖示。
     public HypothesisController hypothesisController;
     // 控制假設選擇介面。
     public ResearchRecordController researchRecordController;
     // 儲存玩家的研究紀錄。
     public MissionHintController missionHintController;
     // 負責顯示目前的任務提示。
+    public DialogueControll dialogueControll;
+    // 共用的對話系統。
+    public GameManager gameManager;
+    // 整個教材的全域流程控制程式。
 
     // ==========================================
     // 初始化
@@ -355,12 +357,14 @@ public class MissionController : MonoBehaviour
 
     private void SetMissionStep(MissionStep newStep)
     {
-        // 更新目前的任務階段。
+        // 更新目前任務階段。
         currentMissionStep = newStep;
 
-
-        // 同步更新畫面上的任務提示。
+        // 更新畫面上的任務文字。
         UpdateMissionHint();
+
+        // 更新目前世界中的任務目標指示。
+        UpdateMissionTarget();
     }
 
     // ==========================================
@@ -473,13 +477,134 @@ public class MissionController : MonoBehaviour
     }
 
     // ==========================================
+    // 更新任務目標指示
+    // ==========================================
+
+    private void UpdateMissionTarget()
+    {
+        // 如果沒有指定任務指示器。
+        if (missionTargetIndicator == null)
+        {
+            return;
+        }
+
+
+        // 根據目前任務階段，
+        // 決定世界中的指示器要指向哪裡。
+        switch (currentMissionStep)
+        {
+            // ======================================
+            // 查看電腦任務
+            // ======================================
+
+            case MissionStep.ReadMission:
+
+                // 指向研究室電腦。
+                missionTargetIndicator.SetTarget(
+                    computerTarget
+                );
+
+                break;
+
+
+            // ======================================
+            // 前往溫室
+            // ======================================
+
+            case MissionStep.GoToGreenhouse:
+
+                // 指向溫室。
+                missionTargetIndicator.SetTarget(
+                    greenhouseTarget
+                );
+
+                break;
+
+
+            // ======================================
+            // 觀察親代
+            // ======================================
+
+            case MissionStep.ObserveParents:
+
+                // 玩家此時通常已經在溫室附近。
+                // 仍然暫時維持溫室作為目標。
+                // 因為距離夠近，所以指示器會自動隱藏。
+                missionTargetIndicator.SetTarget(
+                    greenhouseTarget
+                );
+
+                break;
+
+
+            // ======================================
+            // 提出假設
+            // ======================================
+
+            case MissionStep.MakeHypothesis:
+
+                // 此階段是 UI 操作，
+                // 不需要世界中的導航提示。
+                missionTargetIndicator.ClearTarget();
+
+                break;
+
+
+            // ======================================
+            // 回電腦記錄假設
+            // ======================================
+
+            case MissionStep.RecordHypothesis:
+
+                // 指向研究室電腦。
+                missionTargetIndicator.SetTarget(
+                    computerTarget
+                );
+
+                break;
+
+
+            // ======================================
+            // 取得實驗紀錄板
+            // ======================================
+
+            case MissionStep.GetClipboard:
+
+                // 指向場景中的實驗紀錄板。
+                missionTargetIndicator.SetTarget(
+                    clipboardTarget
+                );
+
+                break;
+
+
+            // ======================================
+            // 前往實驗
+            // ======================================
+
+            case MissionStep.ReadyForExperiment:
+
+                // 指向正式進行實驗的位置。
+                missionTargetIndicator.SetTarget(
+                    experimentTarget
+                );
+
+                break;
+        }
+    }
+
+    // ==========================================
     // 第一次顯示目前任務
     // ==========================================
 
     public void ShowCurrentMissionHint()
     {
-        // 顯示目前任務階段所對應的提示。
+        // 顯示目前任務文字。
         UpdateMissionHint();
+
+
+        // 同時顯示目前任務的世界目標。
+        UpdateMissionTarget();
     }
 
     // ==========================================
@@ -550,4 +675,6 @@ public class MissionController : MonoBehaviour
             "玩家已取得實驗紀錄板，任務進入 ReadyForExperiment。"
         );
     }
+
+
 }

@@ -154,9 +154,9 @@ public class GameManager : MonoBehaviour
 
         // 使用共用對話系統播放開場內容。
         dialogueControll.OpenDialogue(
-            "", // 如果開場沒有特定說話者，名稱可以先留空。
+            "指導老師", // 如果開場沒有特定說話者，名稱可以先留空。
 
-            null, // 如果開場沒有角色圖片，可以先不指定。
+            missionController.teacherVisual, // 如果開場沒有角色圖片，可以先不指定。
 
             new string[]
             {
