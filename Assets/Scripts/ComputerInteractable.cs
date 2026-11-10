@@ -30,6 +30,13 @@ public class ComputerInteractable : MonoBehaviour
 
     public bool IsPlayerInRange(Transform player)
     {
+        InteractionDebug.LogDistance(
+            "使用電腦",
+            player,
+            transform,
+            interactionDistance
+        );
+
         // 計算玩家和電腦的距離。
         float distance = Vector3.Distance(
             player.position,

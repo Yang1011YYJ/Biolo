@@ -80,6 +80,13 @@ public class ExperimentClipboardInteractable : MonoBehaviour
         // 2. 判斷玩家距離
         // --------------------------------------
 
+        InteractionDebug.LogDistance(
+            "拾取實驗紀錄板",
+            player,
+            transform,
+            interactionDistance
+        );
+
         // 計算玩家與紀錄板之間的距離。
         float distance =
             Vector3.Distance(

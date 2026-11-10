@@ -323,7 +323,20 @@ public class PlayerClick : MonoBehaviour
                 // 電腦互動不能進入長按移動。
                 return false;
             }
+            // ==================================
+            // 空種植區
+            // ==================================
 
+            PlantingSpot plantingSpot =
+                hit.collider.GetComponentInParent<PlantingSpot>();
+
+            if (plantingSpot != null)
+            {
+                gameManager.TryOpenPlantingSpot(plantingSpot);
+
+                // 點擊種植區不啟用長按移動。
+                return false;
+            }
 
             // ==================================
             // 溫室互動

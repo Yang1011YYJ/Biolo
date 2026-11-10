@@ -464,6 +464,62 @@ public class Move : MonoBehaviour
         return;
     }
 
+    // ==========================================
+    // 系統指定移動：只接受完整路徑
+    // ==========================================
+
+    public bool TrySetSystemTargetPosition(Vector3 destination)
+    {
+        if (!canMove ||
+            agent == null ||
+            !agent.enabled ||
+            !agent.isOnNavMesh)
+        {
+            return false;
+        }
+
+        // 不使用定位空物件的高度。
+        destination.y = agent.transform.position.y;
+
+        calculatedPath.ClearCorners();
+
+        if (!agent.CalculatePath(destination, calculatedPath) ||
+            calculatedPath.status != NavMeshPathStatus.PathComplete)
+        {
+            return false;
+        }
+
+        Vector3[] corners = calculatedPath.corners;
+
+        if (corners.Length == 0)
+        {
+            return false;
+        }
+
+        // 避免目標離 NavMesh 太遠，
+        // Unity 對應到附近其他位置卻被當成成功。
+        Vector3 pathEnd = corners[corners.Length - 1];
+
+        if (GetPlanarSqrDistance(pathEnd, destination) > 0.15f * 0.15f)
+        {
+            return false;
+        }
+
+        agent.isStopped = false;
+
+        // 直接使用剛剛驗證過的路徑。
+        if (!agent.SetPath(calculatedPath))
+        {
+            return false;
+        }
+
+        actualDestination = pathEnd;
+        lastActualDestination = pathEnd;
+        hasLastActualDestination = true;
+        hasDestination = true;
+
+        return true;
+    }
 
     // ==========================================
     // 嘗試移動到完整可達路徑

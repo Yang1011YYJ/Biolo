@@ -99,6 +99,13 @@ public class GreenhouseController : MonoBehaviour
         GameObject clickedObject,
         Transform player)
     {
+        InteractionDebug.LogDistance(
+            "查看牌子",
+            player,
+            clickedObject.transform,
+            interactionDistance
+        );
+
         // 計算玩家和被點擊物件之間的距離。
         float distance = Vector3.Distance(
             player.position,
