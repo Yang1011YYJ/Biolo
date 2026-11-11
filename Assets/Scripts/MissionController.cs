@@ -16,7 +16,14 @@ public class MissionController : MonoBehaviour
         MakeHypothesis,      // 提出假設。
         RecordHypothesis,    // 回電腦紀錄假設。
         GetClipboard,        // 取得實驗紀錄板。
-        ReadyForExperiment   // 準備開始實驗。
+        ReadyForExperiment,     // 準備開始第一次交配。
+        SelfCrossF1,   // 第一子代與矮莖親代乙交配。
+        ObserveFirstOffspring, // 查看第一子代的資訊牌。
+        SowF2Seed,            // 播種 F1 自交取得的種子。
+        ObserveSecondOffspring, // 查看第二子代的資訊牌。
+        ReviewOffspringData, // 開啟實驗紀錄板，比較多株子代的結果。
+        ReviewHypothesis,//老師引導玩家比對原本的假設
+        ReportSubmitted
     }
 
 
@@ -24,6 +31,9 @@ public class MissionController : MonoBehaviour
 
     public MissionStep currentMissionStep = MissionStep.ReadMission;
     // 遊戲開始時，第一個任務階段是查看電腦。
+
+    // 防止第一次觀察 F1 的引導對話重複播放。
+    private bool firstOffspringDialogueStarted = false;
 
     [Header("UI")]
     public Button acceptMissionButton;
@@ -473,6 +483,55 @@ public class MissionController : MonoBehaviour
                 );
 
                 break;
+
+            // ======================================
+            // 第一子代資料牌子查看
+            // ======================================
+            case MissionStep.ObserveFirstOffspring:
+
+                missionHintController.ShowHint(
+                    "查看新長出的第一子代（F1）旁的資訊牌"
+                );
+
+                break;
+
+            case MissionStep.SelfCrossF1:
+                // 提醒兩個交配方必須選取同一株 F1。
+                missionHintController.ShowHint(
+                    "選擇空種植區，連續選同一株第一子代兩次，進行自花授粉"
+                );
+                break;
+
+            case MissionStep.SowF2Seed:
+                // 自交完成後，引導播種取得的種子。
+                missionHintController.ShowHint(
+                    "選擇空種植區，播種第一子代自交取得的種子"
+                );
+                break;
+
+            case MissionStep.ObserveSecondOffspring:
+                // 植株長成後，引導查看資料。
+                missionHintController.ShowHint(
+                    "查看新長出的第二子代（F2）旁的資訊牌"
+                );
+                break;
+
+            case MissionStep.ReviewOffspringData:
+                // 引導玩家使用背包裡已取得的紀錄板。
+                missionHintController.ShowHint(
+                    "從背包開啟實驗紀錄板，查看多株子代的觀察資料"
+                );
+                break;
+
+            case MissionStep.ReviewHypothesis:
+                // 引導玩家回研究室，準備檢視原始假設。
+                missionHintController.ShowHint("前往研究室電腦，檢視原本的假設");
+                break;
+
+            case MissionStep.ReportSubmitted:
+                // 提醒玩家關閉電腦，接續等待流程。
+                missionHintController.ShowHint("報告已提交，請關閉電腦等待研究中心回覆");
+                break;
         }
     }
 
@@ -590,6 +649,24 @@ public class MissionController : MonoBehaviour
                 );
 
                 break;
+
+            case MissionStep.SelfCrossF1:
+            case MissionStep.SowF2Seed:
+            case MissionStep.ObserveSecondOffspring:
+                // 這幾個階段先清除上一個目標，避免箭頭仍指向舊設備。
+                // 動態植株的精確指向之後再接。
+                missionTargetIndicator.ClearTarget();
+                break;
+
+            case MissionStep.ReviewOffspringData:
+                // 紀錄板從背包開啟，不需要場景中的目標箭頭。
+                missionTargetIndicator.ClearTarget();
+                break;
+
+            case MissionStep.ReviewHypothesis:
+                // 將任務箭頭指向研究室電腦。
+                missionTargetIndicator.SetTarget(computerTarget);
+                break;
         }
     }
 
@@ -676,5 +753,198 @@ public class MissionController : MonoBehaviour
         );
     }
 
+    // ==========================================
+    // 玩家查看完第一子代資料
+    // ==========================================
 
+    public bool OnFirstOffspringViewed()
+    {
+        // 只有第一次交配準備階段，才觸發這段後續引導。
+        if (currentMissionStep != MissionStep.ObserveFirstOffspring ||
+            firstOffspringDialogueStarted)
+        {
+            return false;
+        }
+
+        // 播放前就標記，避免重複觸發。
+        firstOffspringDialogueStarted = true;
+
+        gameManager.EnterMissionDialogue();
+
+        dialogueControll.OpenDialogue(
+            "指導老師",
+            teacherVisual,
+            new string[]
+            {
+                // 只描述玩家目前實際觀察到的植株。
+                "這株第一子代是高莖，和高莖親代的外觀相同。我們先把這個觀察結果記下來。",
+
+                // 引導學生思考沒有表現出來的性狀。
+                "不過，它也有一株矮莖親代。矮莖的遺傳訊息，還留在這株第一子代裡嗎？",
+
+                // 說明下一次實驗的操作與目的。
+                "接下來，讓這株第一子代自花授粉，也就是用同一株植物的花粉完成授粉，再觀察它產生的第二子代。",
+
+                // 配合目前兩次點選的介面。
+                "請選擇一個空種植區，開啟交配選單，連續選擇同一株第一子代兩次，再確認交配。"
+            },
+            OnFirstOffspringDialogueFinished
+        );
+
+        return true;
+    }
+
+    // ==========================================
+    // 第一子代引導對話結束
+    // ==========================================
+
+    private void OnFirstOffspringDialogueFinished()
+    {
+        // 對話結束後，要求玩家進行 F1 自交。
+        SetMissionStep(MissionStep.SelfCrossF1);
+
+        // 恢復玩家操作。
+        gameManager.ReturnToExploring();
+
+        // 顯示目前進度，方便測試。
+        Debug.Log("任務進度：讓同一株第一子代自花授粉。");
+    }
+
+    // ==========================================
+    // 第一子代已種植完成
+    // ==========================================
+
+    public void OnFirstOffspringPlanted()
+    {
+        // 只在首次實驗階段推進，避免後續播種倒退任務。
+        if (currentMissionStep != MissionStep.ReadyForExperiment)
+        {
+            return;
+        }
+
+        SetMissionStep(MissionStep.ObserveFirstOffspring);
+
+        Debug.Log("任務進度：查看第一子代資訊牌。");
+    }
+
+    public void OnF1SelfCrossCompleted()
+    {
+        // 只在要求 F1 自交的階段推進，避免任務倒退。
+        if (currentMissionStep != MissionStep.SelfCrossF1)
+        {
+            return;
+        }
+
+        // 自交成功取得種子後，下一步是播種。
+        SetMissionStep(MissionStep.SowF2Seed);
+    }
+
+    public void OnSecondOffspringPlanted()
+    {
+        // 只在要求播種 F2 的階段推進。
+        if (currentMissionStep != MissionStep.SowF2Seed)
+        {
+            return;
+        }
+
+        // 播種成功後，要求玩家查看 F2 牌子。
+        SetMissionStep(MissionStep.ObserveSecondOffspring);
+    }
+
+    public bool OnSecondOffspringViewed()
+    {
+        // 只有正在等待觀察 F2 時，才播放這段引導。
+        if (currentMissionStep != MissionStep.ObserveSecondOffspring)
+        {
+            return false;
+        }
+
+        // 玩家已查看完 F2，開放紀錄板的多株觀察資料。
+        researchRecordController.UnlockOffspringData();
+
+        // 接續原本的任務切換。
+        // 先切換任務，避免重複關閉牌子時再次觸發。
+        SetMissionStep(MissionStep.ReviewOffspringData);
+
+        // 對話期間暫停玩家操作。
+        gameManager.EnterMissionDialogue();
+
+        // 引導學生從單株觀察，進一步查看多株資料。
+        dialogueControll.OpenDialogue(
+            "指導老師",
+            teacherVisual,
+            new string[]
+            {
+            // 不預設玩家這次種出的性狀。
+            "我們已經觀察了這株第二子代。不過，一株的結果，還不能告訴我們整批子代會有哪些性狀、各有多少。",
+
+            // 說明接下來比較資料的目的。
+            "接下來，把你的觀察和研究中心提供的多株培育資料放在一起，比較第一子代與第二子代的高、矮莖結果。",
+
+            // 告知下一個操作。
+            "請從背包開啟實驗紀錄板，查看子代的觀察資料。"
+            },
+            () =>
+            {
+                // 對話結束後，恢復自由操作。
+                gameManager.ReturnToExploring();
+            }
+        );
+
+        // 通知牌子系統：老師對話已接手操作狀態。
+        return true;
+    }
+
+    public bool TryStartOffspringReviewDialogue()
+    {
+        // 只有正在判讀子代資料，而且兩題都答對，才接續對話。
+        if (currentMissionStep != MissionStep.ReviewOffspringData ||
+            researchRecordController == null ||
+            !researchRecordController.OffspringQuizCompleted)
+        {
+            return false;
+        }
+
+        // 推進任務，避免下次關閉背包時重播。
+        SetMissionStep(MissionStep.ReviewHypothesis);
+
+        // 讓老師對話接手玩家操作。
+        gameManager.EnterMissionDialogue();
+
+        // 引導玩家用兩代的資料檢視原本的假設。
+        dialogueControll.OpenDialogue(
+            "指導老師",
+            teacherVisual,
+            new string[]
+            {
+            "你找到了兩個線索。這份資料裡，第一子代都是高莖，到了第二子代，矮莖又出現了。",
+            "回想一下你最初的假設。如果矮莖是顯性，純品系高莖和純品系矮莖交配後，第一子代應該長成什麼樣子？",
+            "請回到研究室的電腦，比一比你原本的預測和觀察結果，想想你的假設是否需要修正。"
+            },
+            // 老師說完後，再讓玩家自由移動。
+            gameManager.ReturnToExploring
+        );
+
+        // 告知呼叫端，這次由對話接手。
+        return true;
+    }
+
+    public bool TrySubmitHypothesisReport(
+    ResearchRecordController.HypothesisType judgment)
+    {
+        // 確認目前正在檢視假設，並且玩家已選擇一個判斷。
+        if (currentMissionStep != MissionStep.ReviewHypothesis ||
+            researchRecordController == null ||
+            judgment == ResearchRecordController.HypothesisType.None)
+        {
+            return false;
+        }
+
+        // 保存本次報告，供研究中心產生回覆。
+        researchRecordController.SaveSubmittedHypothesis(judgment);
+
+        // 標記報告已提交，等待玩家關閉電腦。
+        SetMissionStep(MissionStep.ReportSubmitted);
+        return true;
+    }
 }

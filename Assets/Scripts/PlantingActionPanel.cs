@@ -29,11 +29,13 @@ public class PlantingActionPanel : MonoBehaviour
 
     private Action<PlantingSpot> onMat;
     private Action onClose;
+    // 播種按鈕按下後，交由 GameManager 處理。
+    private Action<PlantingSpot> onSow;
 
     private void Awake()
     {
         sowButton.interactable = false;
-
+        sowButton.onClick.AddListener(OnSowClicked);
         MatButton.onClick.AddListener(
             OnMatClicked
         );
@@ -51,13 +53,14 @@ public class PlantingActionPanel : MonoBehaviour
     Action<PlantingSpot> crossbreedCallback,
     Action closeCallback,
     int seedCount = 0,
-    string message = null)
+    string message = null,
+    Action<PlantingSpot> sowCallback = null)
     {
         currentSpot = spot;
 
         onMat = crossbreedCallback;
         onClose = closeCallback;
-
+        onSow = sowCallback;
         titleText.text = spot.spotName;
 
         hintText.text = string.IsNullOrEmpty(message)
@@ -69,7 +72,9 @@ public class PlantingActionPanel : MonoBehaviour
             : message;
 
         sowButton.interactable =
-            seedCount > 0 && spot.CanUse();
+            seedCount > 0 &&
+            spot.CanUse() &&
+            onSow != null;
 
         MatButton.interactable = spot.CanUse();
 
@@ -111,6 +116,7 @@ public class PlantingActionPanel : MonoBehaviour
         currentSpot = null;
         onMat = null;
         onClose = null;
+        onSow = null;
     }
 
     private void OnDestroy()
@@ -128,5 +134,26 @@ public class PlantingActionPanel : MonoBehaviour
                 OnCloseClicked
             );
         }
+
+        if (sowButton != null)
+        {
+            sowButton.onClick.RemoveListener(OnSowClicked);
+        }
+    }
+
+    private void OnSowClicked()
+    {
+        if (currentSpot == null ||
+            !currentSpot.CanUse() ||
+            onSow == null)
+        {
+            return;
+        }
+
+        PlantingSpot spot = currentSpot;
+        Action<PlantingSpot> callback = onSow;
+
+        Hide();
+        callback.Invoke(spot);
     }
 }

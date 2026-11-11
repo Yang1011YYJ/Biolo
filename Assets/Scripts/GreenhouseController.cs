@@ -32,6 +32,10 @@ public class GreenhouseController : MonoBehaviour
     public GameObject shortPeaSign;
     // 矮莖親代的牌子。
 
+    // 目前查看的子代牌子。
+    // 查看原本甲、乙牌子時為 null。
+    private PeaInfoSign currentOffspringSign;
+
 
     // ==========================================
     // 牌子互動設定
@@ -119,6 +123,8 @@ public class GreenhouseController : MonoBehaviour
             // 顯示測試訊息。
             Debug.Log("距離牌子太遠。");
 
+            gameManager.ShowSystemHint("距離牌子太遠，請再靠近一點");
+
             // 表示這次沒有成功開啟牌子。
             return false;
         }
@@ -183,6 +189,8 @@ public class GreenhouseController : MonoBehaviour
 
     private void ShowTallPeaSign()
     {
+        currentOffspringSign = null;
+
         // 設定標題。
         signTitleText.text = "親代甲";
 
@@ -204,6 +212,8 @@ public class GreenhouseController : MonoBehaviour
 
     private void ShowShortPeaSign()
     {
+        currentOffspringSign = null;
+
         // 設定標題。
         signTitleText.text = "親代乙";
 
@@ -225,32 +235,92 @@ public class GreenhouseController : MonoBehaviour
 
     public void CloseSign()
     {
-        // 先把牌子資訊 Panel 關掉。
         signPanel.SetActive(false);
 
+        // ======================================
+        // 剛剛查看的是子代牌子
+        // ======================================
 
-        // 檢查兩株親代是不是都已經查看過。
+        if (currentOffspringSign != null)
+        {
+            // 先保存資料，再清除目前查看紀錄。
+            SeedData seed = currentOffspringSign.seed;
+            currentOffspringSign = null;
+
+            // 有來源資料時，依交配類型通知對應的觀察任務。
+            if (seed != null)
+            {
+                // 預設沒有老師對話接手。
+                bool dialogueStarted = false;
+
+                // 原本親代交配產生的植株，走 F1 觀察流程。
+                if (seed.crossType == SeedData.CrossType.OriginalParents)
+                {
+                    dialogueStarted =
+                        missionController.OnFirstOffspringViewed();
+                }
+                else if (seed.crossType == SeedData.CrossType.F1SelfCross)
+                {
+                    // F1 自交產生的植株，走 F2 觀察流程。
+                    dialogueStarted =
+                        missionController.OnSecondOffspringViewed();
+                }
+
+                // 有老師對話時，保持操作鎖定，交給對話結束回呼恢復。
+                if (dialogueStarted)
+                {
+                    return;
+                }
+            }
+
+            // 已播放過引導，或不是第一子代，
+            // 正常回到探索。
+            gameManager.ReturnToExploring();
+            return;
+        }
+
+        // ======================================
+        // 原本親代甲、乙的觀察流程
+        // ======================================
+
         if (tallPeaViewed && shortPeaViewed)
         {
-            // 通知 MissionController：
-            // 玩家已經完成兩株親代的觀察。
             bool missionDialogueStarted =
                 missionController.OnParentsObserved();
 
-
-            // 如果 MissionController 已經開始播放老師對話。
             if (missionDialogueStarted)
             {
-                // 就不要回到 Exploring。
-                // 因為現在已經進入 MissionDialogue。
                 return;
             }
         }
 
-
-        // 如果還沒看完兩株，
-        // 或這段任務對話之前已經播放過，
-        // 就正常回到自由探索。
         gameManager.ReturnToExploring();
+    }
+
+    // ==========================================
+    // 查看種植區中的子代
+    // ==========================================
+
+    public bool OpenOffspringSign(PeaInfoSign sign)
+    {
+        // 沒有牌子或來源種子，就不開啟資訊。
+        if (sign == null || sign.seed == null)
+        {
+            return false;
+        }
+        // 保存目前查看的牌子，供關閉時判斷任務進度。
+        currentOffspringSign = sign;
+        // 顯示子代名稱，不加入種子編號。
+        signTitleText.text = sign.title;
+
+        // 顯示植株的性狀，以及產生這顆種子的兩個親代。
+        signContentText.text =
+            $"觀察性狀：{sign.observedTrait}\n\n" +
+            $"親代來源：{sign.seed.firstParentName} × " +
+            $"{sign.seed.secondParentName}";
+
+        signPanel.SetActive(true);
+
+        return true;
     }
 }

@@ -326,7 +326,15 @@ public class PlayerClick : MonoBehaviour
             // ==================================
             // 空種植區
             // ==================================
+            // 子代資訊牌優先於種植區判斷。
+            PeaInfoSign peaSign =
+                hit.collider.GetComponentInParent<PeaInfoSign>();
 
+            if (peaSign != null)
+            {
+                gameManager.TryOpenOffspringSign(peaSign);
+                return false;
+            }
             PlantingSpot plantingSpot =
                 hit.collider.GetComponentInParent<PlantingSpot>();
 

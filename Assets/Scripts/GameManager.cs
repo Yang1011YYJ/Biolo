@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI; // 引入 Unity 基本功能。
 using System.Collections;
 using UnityEngine.AI;
+using System.Collections.Generic;
 
 public class GameManager : MonoBehaviour
 {
@@ -21,7 +22,8 @@ public class GameManager : MonoBehaviour
         Inventory,       // 玩家正在操作背包。
         PlantingActions,  // 玩家正在選擇播種或交配。
         ParentSelection, // 正在選擇交配親代。
-        BreedingSequence // 系統控制玩家進行交配演出。
+        BreedingSequence, // 系統控制玩家進行交配演出。
+        SeedSelection // 玩家正在選擇要播種的種子。
     }
 
 
@@ -43,6 +45,7 @@ public class GameManager : MonoBehaviour
     public GameObject computerPanel; // 電腦介面。
     public GameObject BlackPanel;
     public Button startButton;
+    public GameObject StartPanel;
     [Tooltip("背包介面UI")] public GameObject BackpackPanel;
 
     [Header("場景中的設備")]
@@ -67,13 +70,47 @@ public class GameManager : MonoBehaviour
     // 按下開始交配時的玩家位置。
     private Vector3 breedingReturnPosition;
 
-    [Header("種子")]
+    //[Tooltip("目前持有的第一子代種子數量。純品系高莖與矮莖交配成功後增加。")]
+    //[Min(0)]
+    //public int firstGenerationSeedCount = 0;
+    [Header("種子與播種")]
 
-    [Tooltip("目前持有的第一子代種子數量。純品系高莖與矮莖交配成功後增加。")]
-    [Min(0)]
-    public int firstGenerationSeedCount = 0;
+    [Tooltip("目前持有的種子。每次交配新增一筆，播種時移除選中的那筆。")]
+    public List<SeedData> ownedSeeds = new List<SeedData>();
 
-    [Header("親代選擇")]
+    [Tooltip("顯示種子清單與確認播種按鈕的面板控制器。")]
+    public SeedSelectionPanel seedSelectionPanel;
+
+    [Tooltip("目前甲、乙交配所得 F1 的高莖植株 Prefab。")]
+    public GameObject firstGenerationPlantPrefab;
+    [Tooltip("第二次交配產生矮莖子代時使用的植株 Prefab，根物件須掛上 PeaPlant。")]
+    public GameObject shortOffspringPlantPrefab;
+
+    // 保留原本讀取數量的名稱，既有選單呼叫不用全部修改。
+    public int firstGenerationSeedCount => ownedSeeds.Count;
+    [Tooltip("下一顆種子的顯示編號。播種消耗種子後不會倒退，避免名稱重複。")]
+    [SerializeField, Min(1)]
+    private int nextSeedNumber = 1;
+
+    [Header("可交配植株")]
+
+    [Tooltip("目前可供選擇的植株。開場指定甲、乙，播種後由程式加入子代。")]
+    public List<PeaPlant> availableParents = new List<PeaPlant>();
+
+    [Tooltip("開場的矮莖親代乙，用來驗證第二次交配組合。")]
+    public PeaPlant shortOriginalParent;
+    [Header("植株生成高度")]
+
+    [Tooltip("高莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]
+    public float tallPlantWorldY= 31.87150001525879f;
+
+    [Tooltip("矮莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]
+    public float shortPlantWorldY= 30.60569953918457f;
+
+    [Header("展示與快速測試")]
+
+    [Tooltip("開始畫面的階段選單：0 正常開始、1 直接交配。未指定時走正常流程。")]
+    public TMP_Dropdown startupStageDropdown;
 
     [Header("腳本")]
     public FadeController fadeController;
@@ -86,6 +123,11 @@ public class GameManager : MonoBehaviour
     // 保存這次確認的兩株親代，後續演出依此順序走位。
     private PeaPlant selectedFirstParent;
     private PeaPlant selectedSecondParent;
+    [Tooltip("畫面下方共用提示框，顯示操作結果、距離不足及獲得道具訊息。")]public SystemHintController systemHintController;
+    [Tooltip("共用的溫室資訊控制器，用來顯示已種下子代的資料。")]public GreenhouseController greenhouseController;
+    [Tooltip("播種成功後生成的資訊牌子 Prefab，需掛有 PeaInfoSign。")]
+    public PeaInfoSign offspringSignPrefab;
+    [Tooltip("場景中可拾取的實驗紀錄板。快速開始時會將它加入背包並隱藏。")]public ExperimentClipboardInteractable experimentClipboard;
 
 
     private void Start()
@@ -133,6 +175,7 @@ public class GameManager : MonoBehaviour
 
         //關閉開始按鈕
         startButton.gameObject.SetActive(false);
+        StartPanel.SetActive(false);
 
         //// 顯示目前 GameManager 指到的是哪一個物件。
         //Debug.LogError("電腦物件名稱：" + computerObject.name);
@@ -146,10 +189,35 @@ public class GameManager : MonoBehaviour
 
     public void StartButton()
     {
+        // 避免開始後重複啟動。
+        if (currentState != GameState.PreStart)
+        {
+            return;
+        }
+
+        int selectedStage = startupStageDropdown != null
+            ? startupStageDropdown.value
+            : 0;
+
+        // 快速測試：不等待黑幕與開場對話。
+        if (selectedStage == 1)
+        {
+            StartFromTestStage();
+            return;
+        }
+
+        // 正常開始時隱藏選單。
+        if (startupStageDropdown != null)
+        {
+            startupStageDropdown.gameObject.SetActive(false);
+        }
         //Debug.LogError("★★★ 現在執行的是 GameManager.StartButton ★★★");
 
         if (currentState == GameState.PreStart)
         {
+            // 淡入開始就離開 PreStart，避免重複點擊啟動。
+            SetState(GameState.Intro);
+
             Debug.Log("2. 狀態是 PreStart");
 
             BlackPanel.SetActive(true);
@@ -177,6 +245,105 @@ public class GameManager : MonoBehaviour
                 });
             });
         }
+    }
+
+    // ==========================================
+    // 快速開始：交配測試
+    // ==========================================
+
+    private void StartFromTestStage()
+    {
+        // ======================================
+        // 先確認快速開始需要的元件
+        // ======================================
+
+        if (missionController == null ||
+            missionController.researchRecordController == null ||
+            greenhouseController == null ||
+            experimentClipboard == null)
+        {
+            Debug.LogError(
+                "快速開始設定不完整：請確認任務、研究紀錄、" +
+                "溫室控制器與場景紀錄板。"
+            );
+
+            return;
+        }
+
+        // 確認能取得紀錄板，再開始切換流程。
+        if (!experimentClipboard.GrantForQuickStart())
+        {
+            return;
+        }
+
+        // ======================================
+        // 補齊假設與正式紀錄
+        // ======================================
+
+        ResearchRecordController record =
+            missionController.researchRecordController;
+
+        record.SaveHypothesis(
+            ResearchRecordController.HypothesisType.ShortStemDominant
+        );
+
+        record.RecordHypothesis();
+
+        // ======================================
+        // 補齊任務與觀察狀態
+        // ======================================
+
+        missionController.missionAccepted = true;
+
+        greenhouseController.tallPeaViewed = true;
+        greenhouseController.shortPeaViewed = true;
+
+        missionController.currentMissionStep =
+            MissionController.MissionStep.ReadyForExperiment;
+
+        // 同步任務接受介面。
+        if (missionController.AcceptMissionState != null)
+        {
+            missionController.AcceptMissionState.text = "已接受";
+
+            missionController.AcceptMissionState.color =
+                new Color(0f, 0.84f, 0f, 1f);
+        }
+
+        if (missionController.acceptMissionButton != null)
+        {
+            missionController.acceptMissionButton.interactable = false;
+        }
+
+        // ======================================
+        // 顯示場景、關閉開始介面
+        // ======================================
+
+        StartGame();
+
+        BlackPanel.SetActive(false);
+        computerPanel.SetActive(false);
+        BackpackPanel.SetActive(false);
+
+        if (startupStageDropdown != null)
+        {
+            startupStageDropdown.gameObject.SetActive(false);
+        }
+
+        // ======================================
+        // 進入交配前的自由探索
+        // ======================================
+
+        ReturnToExploring();
+
+        missionController.ShowCurrentMissionHint();
+
+        Debug.Log(
+            "快速開始完成｜任務已接受｜親代皆已觀察｜" +
+            $"假設：{record.GetHypothesisDescription()}｜" +
+            $"已記錄：{record.IsHypothesisRecorded()}｜" +
+            "紀錄板已加入背包｜ReadyForExperiment"
+        );
     }
 
     // ==========================================
@@ -261,6 +428,8 @@ public class GameManager : MonoBehaviour
         {
             // 目前先用 Console 提示。
             Debug.Log("距離電腦太遠。");
+
+            ShowSystemHint("距離電腦太遠，請再靠近一點");
 
             // 不執行後續操作。
             return;
@@ -409,42 +578,58 @@ public class GameManager : MonoBehaviour
 
     public void TryOpenPlantingSpot(PlantingSpot spot)
     {
-        if (currentState != GameState.Exploring)
+        if (currentState != GameState.Exploring ||
+            spot == null)
         {
             return;
         }
 
-        if (spot == null || plantingActionPanel == null)
-        {
-            Debug.LogWarning("種植區或操作選單尚未指定。");
-            return;
-        }
-
-        if (!spot.CanUse())
-        {
-            Debug.Log("這個種植區目前無法使用。");
-            return;
-        }
-
-        // 目前先沿用與電腦相同的操作方式：
-        // 玩家走近後，再點擊開啟。
         if (!spot.IsPlayerInRange(player))
         {
-            Debug.Log("距離種植區太遠，請先走近。");
+            ShowSystemHint("距離種植區太遠，請再靠近一點");
+            return;
+        }
+
+        // ======================================
+        // 有植物：嘗試查看子代資料
+        // ======================================
+
+        if (spot.isOccupied)
+        {
+            ShowSystemHint("這裡已經有植物，請查看旁邊的資訊牌");
+            return;
+        }
+
+        // ======================================
+        // 正在使用中
+        // ======================================
+
+        if (spot.isReserved)
+        {
+            ShowSystemHint("這個種植區正在使用中");
+            return;
+        }
+
+        // ======================================
+        // 空種植區：開啟操作選單
+        // ======================================
+
+        if (plantingActionPanel == null)
+        {
+            Debug.LogWarning("尚未指定種植操作選單。");
             return;
         }
 
         selectedPlantingSpot = spot;
 
-        // 切換狀態時，既有 SetState 會停止玩家移動，
-        // PlayerClick 也會停止接受場景輸入。
         SetState(GameState.PlantingActions);
 
         plantingActionPanel.Open(
             spot,
             OnCrossbreedSelected,
             ClosePlantingActions,
-            firstGenerationSeedCount
+            firstGenerationSeedCount,
+            sowCallback: OnSowSelected
         );
     }
 
@@ -471,11 +656,15 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 只有完成前置任務，才能進入首次交配。
-        if (missionController.currentMissionStep !=
-            MissionController.MissionStep.ReadyForExperiment)
+        bool canStartCross =
+    missionController.currentMissionStep ==
+        MissionController.MissionStep.ReadyForExperiment ||
+    missionController.currentMissionStep ==
+        MissionController.MissionStep.SelfCrossF1;
+
+        if (!canStartCross)
         {
-            Debug.Log("請先完成任務準備並取得實驗紀錄板。");
+            ShowSystemHint("請先完成目前的任務");
             ClosePlantingActions();
             return;
         }
@@ -493,6 +682,7 @@ public class GameManager : MonoBehaviour
         SetState(GameState.ParentSelection);
 
         parentSelectionPanel.Open(
+            availableParents,
             OnParentsConfirmed,
             CancelParentSelection
         );
@@ -520,7 +710,6 @@ public class GameManager : MonoBehaviour
             !selectedPlantingSpot.CanUse() ||
             first == null ||
             second == null ||
-            first == second ||
             !first.canBreed ||
             !second.canBreed)
         {
@@ -528,7 +717,54 @@ public class GameManager : MonoBehaviour
             CancelParentSelection();
             return;
         }
+        // 暫時沿用既有任務列舉名稱，這個階段現在改為要求 F1 自交。
+        // 後續整理任務文字時，再一起調整名稱。
+        if (missionController.currentMissionStep ==
+            MissionController.MissionStep.SelfCrossF1)
+        {
+            // 同一株植物必須同時擔任兩個交配方。
+            // 來源也必須是原本親代交配產生的第一子代。
+            bool validSelfCross =
+                first == second &&
+                first.sourceSeed != null &&
+                first.sourceSeed.generation == 1 &&
+                first.sourceSeed.crossType ==
+                    SeedData.CrossType.OriginalParents;
 
+            // 選錯組合時，讓玩家重新選擇。
+            if (!validSelfCross)
+            {
+                // 說明自交在這個面板中的操作方式。
+                ShowSystemHint("這次請連續選擇同一株第一子代，讓它自花授粉");
+
+                // 重新開啟面板，也會清空剛才的選擇。
+                parentSelectionPanel.Open(
+                    availableParents,
+                    OnParentsConfirmed,
+                    CancelParentSelection
+                );
+
+                // 不進入自動走位。
+                return;
+            }
+
+            // 組合符合，繼續執行下方原本的走位流程。
+        }
+        else if (first == second)
+        {
+            // 其他階段暫時維持選擇兩株不同植物的規則。
+            ShowSystemHint("這個階段請選擇兩株不同的親代");
+
+            // 重新開啟選擇面板。
+            parentSelectionPanel.Open(
+                availableParents,
+                OnParentsConfirmed,
+                CancelParentSelection
+            );
+
+            // 不執行後續交配。
+            return;
+        }
         if (first.interactionPoint == null ||
             second.interactionPoint == null)
         {
@@ -582,6 +818,8 @@ public class GameManager : MonoBehaviour
             yield break;
         }
 
+        //FacePeaPlant(selectedFirstParent.interactionPoint);
+
         yield return new WaitForSeconds(parentVisitWait);
 
         // 第二株親代。
@@ -595,6 +833,8 @@ public class GameManager : MonoBehaviour
             FinishBreedingMovement(false);
             yield break;
         }
+
+        //FacePeaPlant(selectedSecondParent.interactionPoint);
 
         yield return new WaitForSeconds(parentVisitWait);
 
@@ -726,7 +966,95 @@ public class GameManager : MonoBehaviour
         }
 
         // 成功返回後，取得一顆種子。
-        firstGenerationSeedCount++;
+        string seedId = System.Guid.NewGuid().ToString("N");
+
+        // 判斷這次是否為第一子代與矮莖親代乙交配。
+        // 使用實際選取的植物資料判斷，保留原本的選取順序。
+        // 判斷是否為同一株第一子代自交。
+        bool isF1SelfCross =
+            selectedFirstParent == selectedSecondParent &&
+            selectedFirstParent.sourceSeed != null &&
+            selectedFirstParent.sourceSeed.generation == 1 &&
+            selectedFirstParent.sourceSeed.crossType ==
+                SeedData.CrossType.OriginalParents;
+
+        // 判斷是否為第一子代與原本矮莖親代交配。
+        // 先保留這種分類，供之後的延伸實驗使用。
+        bool isBackcross =
+            (
+                selectedFirstParent == shortOriginalParent &&
+                selectedSecondParent.sourceSeed != null &&
+                selectedSecondParent.sourceSeed.generation == 1
+            )
+            ||
+            (
+                selectedSecondParent == shortOriginalParent &&
+                selectedFirstParent.sourceSeed != null &&
+                selectedFirstParent.sourceSeed.generation == 1
+            );
+
+        // 原本親代交配為預設來源。
+        SeedData.CrossType crossType =
+            SeedData.CrossType.OriginalParents;
+
+        // 優先辨識 F1 自交。
+        if (isF1SelfCross)
+        {
+            crossType = SeedData.CrossType.F1SelfCross;
+        }
+        else if (isBackcross)
+        {
+            crossType = SeedData.CrossType.F1WithShortParent;
+        }
+
+        // 建立種子，保留原本的編號和親代來源。
+        SeedData newSeed = new SeedData
+        {
+            seedId = seedId, // 保存唯一識別碼。
+            displayName = $"豌豆種子 {nextSeedNumber:D2}", // 保留原本種子命名。
+            firstParentName = selectedFirstParent.displayName, // 第一個交配方。
+            secondParentName = selectedSecondParent.displayName, // 第二個交配方。
+            generation = crossType == SeedData.CrossType.OriginalParents ? 1 : 2,
+            crossType = crossType // 保存交配類型。
+        };
+
+        // 在取得種子時決定性狀，播種時不會重新抽取。
+        switch (crossType)
+        {
+            case SeedData.CrossType.F1SelfCross:
+                // F1 自交：每顆種子的高莖機率為 75%。
+                newSeed.isTall = UnityEngine.Random.value < 0.75f;
+                break;
+
+            case SeedData.CrossType.F1WithShortParent:
+                // 保留原本回交的高、矮莖機率設定。
+                newSeed.isTall = UnityEngine.Random.value < 0.5f;
+                break;
+
+            default:
+                // 原本兩株純品系親代交配，F1 固定為高莖。
+                newSeed.isTall = true;
+                break;
+        }
+
+        // 確認這次建立的種子分類。
+        Debug.Log(
+            $"種子建立｜交配類型：{newSeed.crossType}｜" +
+            $"世代：{newSeed.generation}｜" +
+            $"來源：{newSeed.firstParentName} × {newSeed.secondParentName}"
+        );
+
+        ownedSeeds.Add(newSeed);
+
+        // 確認種子已加入持有清單，才通知任務系統自交完成。
+        if (newSeed.crossType == SeedData.CrossType.F1SelfCross)
+        {
+            missionController.OnF1SelfCrossCompleted();
+        }
+
+        // 新增成功後，準備下一個編號。
+        nextSeedNumber++;
+        ShowSystemHint("交配成功！獲得種子 ×1");
 
         Debug.Log(
             $"交配成功｜獲得種子 ×1｜" +
@@ -753,9 +1081,7 @@ public class GameManager : MonoBehaviour
             OnCrossbreedSelected,
             ClosePlantingActions,
             firstGenerationSeedCount,
-            $"交配成功！獲得種子 ×1\n" +
-            $"目前持有種子：{firstGenerationSeedCount} 顆\n" +
-            "可以選擇播種。"
+            sowCallback: OnSowSelected
         );
     }
 
@@ -769,5 +1095,301 @@ public class GameManager : MonoBehaviour
         difference.y = 0f;
 
         return difference.magnitude;
+    }
+
+    public void ShowSystemHint(string message, float duration = -1f)
+    {
+        if (systemHintController == null)
+        {
+            Debug.LogWarning($"尚未指定系統提示框｜{message}");
+            return;
+        }
+
+        systemHintController.Show(message, duration);
+    }
+
+    private void OnSowSelected(PlantingSpot spot)
+    {
+        if (spot == null || !spot.CanUse())
+        {
+            ShowSystemHint("這個種植區目前無法使用");
+            ClosePlantingActions();
+            return;
+        }
+
+        if (ownedSeeds.Count == 0)
+        {
+            ShowSystemHint("尚無可播種的種子");
+            ClosePlantingActions();
+            return;
+        }
+
+        if (seedSelectionPanel == null)
+        {
+            Debug.LogWarning("尚未指定種子選擇面板。");
+            ClosePlantingActions();
+            return;
+        }
+
+        selectedPlantingSpot = spot;
+
+        SetState(GameState.SeedSelection);
+
+        seedSelectionPanel.Open(
+            ownedSeeds,
+            spot.spotName,
+            OnSeedConfirmed,
+            ClosePlantingActions
+        );
+    }
+
+    private void OnSeedConfirmed(SeedData seed)
+    {
+        PlantingSpot spot = selectedPlantingSpot;
+
+        // 再次驗證，避免重複播種或使用已不存在的種子。
+        if (currentState != GameState.SeedSelection ||
+            spot == null ||
+            !spot.CanUse() ||
+            seed == null ||
+            !ownedSeeds.Contains(seed))
+        {
+            ShowSystemHint("無法播種，請重新選擇種子與位置");
+            ClosePlantingActions();
+            return;
+        }
+
+        // 確認種子屬於目前支援的交配來源。
+        // 接受原本親代交配、回交，以及這次新增的 F1 自交種子。
+        if (seed.crossType != SeedData.CrossType.OriginalParents &&
+            seed.crossType != SeedData.CrossType.F1WithShortParent &&
+            seed.crossType != SeedData.CrossType.F1SelfCross)
+        {
+            // 未支援的來源不消耗種子。
+            ShowSystemHint("目前尚未開放這種種子的播種");
+            ClosePlantingActions();
+            return;
+        }
+
+        // 判斷是否為原本親代交配產生的第一子代。
+        bool isFirstOffspring =
+            seed.crossType == SeedData.CrossType.OriginalParents;
+
+        // 第一子代固定使用高莖；第二次交配讀取種子保存的結果。
+        bool isTall = isFirstOffspring || seed.isTall;
+
+        // 取得這次要顯示的性狀文字。
+        string traitText = isTall ? "高莖" : "矮莖";
+
+        // 取得這次植株與牌子使用的名稱。
+        // 依種子的交配來源決定植株與牌子的標題。
+        string offspringTitle;
+
+        // 原本親代交配產生第一子代。
+        if (isFirstOffspring)
+        {
+            offspringTitle = "第一子代（F1）";
+        }
+        else if (seed.crossType == SeedData.CrossType.F1SelfCross)
+        {
+            // 第一子代自交產生第二子代。
+            offspringTitle = "第二子代（F2）";
+        }
+        else
+        {
+            // 保留回交子代的獨立名稱。
+            offspringTitle = "回交子代";
+        }
+
+        // 依性狀選擇要生成的模型。
+        GameObject plantPrefab = isTall
+            ? firstGenerationPlantPrefab
+            : shortOffspringPlantPrefab;
+
+        // 生成前確認模型和植株元件都已設定。
+        if (plantPrefab == null ||
+            plantPrefab.GetComponent<PeaPlant>() == null)
+        {
+            // 顯示缺少設定的性狀，方便回到 Inspector 檢查。
+            Debug.LogWarning(
+                $"{traitText}植株 Prefab 未指定，或根物件尚未掛上 PeaPlant。"
+            );
+
+            // 保留種子，讓玩家可以在修正設定後重新播種。
+            ShowSystemHint("目前無法播種，種子已保留");
+            ClosePlantingActions();
+            return;
+        }
+
+        //Transform spawnPoint = spot.offspringSpawnPoint;
+        // 從這次選定種植區的直接子物件取得交配走位點。
+        Transform offspringInteractionPoint =
+            spot.transform.Find("Interaction Point");
+
+        if (offspringInteractionPoint == null)
+        {
+            Debug.LogWarning(
+                $"種植區「{spot.name}」底下找不到 Interaction Point。",
+                spot
+            );
+
+            ShowSystemHint("目前無法播種，種子已保留");
+            ClosePlantingActions();
+            return;
+        }
+
+        // 牌子也先確認設定，避免植物生成後才因缺少牌子設定中斷。
+        if (spot.signSpawnPoint == null ||
+            offspringSignPrefab == null)
+        {
+            Debug.LogWarning("尚未指定牌子生成點或牌子 Prefab。");
+
+            ShowSystemHint("目前無法播種，種子已保留");
+            ClosePlantingActions();
+            return;
+        }
+        // X、Z 使用所選種植區的位置；Y 使用各性狀設定的世界高度。
+        Vector3 plantPosition = new Vector3(
+            spot.transform.position.x,
+            isTall ? tallPlantWorldY : shortPlantWorldY,
+            spot.transform.position.z
+        );
+
+        // 先在世界生成，使用對應 Prefab 的原始旋轉與大小。
+        GameObject plant = Instantiate(
+            plantPrefab,
+            plantPosition,
+            plantPrefab.transform.rotation
+        );
+
+        // 再歸到種植區底下，保留世界位置、旋轉與大小。
+        plant.transform.SetParent(spot.transform, true);
+        PeaPlant offspring = plant.GetComponent<PeaPlant>();
+        // 使用所屬種植區的走位點，不使用 Prefab 預先指定的位置。
+        offspring.interactionPoint = offspringInteractionPoint;
+
+        // 保存這株植物的種子來源。
+        offspring.sourceSeed = seed;
+
+        // 名稱包含子代分類和種子編號，方便交配選單辨識。
+        offspring.displayName = $"{offspringTitle}";
+
+        // 顯示這株植物實際長出的性狀。
+        offspring.description = $"性狀：{traitText}";
+
+        // 保留原本允許選作交配對象的設定。
+        offspring.canBreed = true;
+
+        if (!availableParents.Contains(offspring))
+        {
+            availableParents.Add(offspring);
+        }
+
+        // Hierarchy 名稱包含子代分類、性狀。
+        plant.name = $"{offspringTitle}_{traitText}";
+
+        // 保存此種植區使用的種子來源。
+        spot.plantedSeed = seed;
+        spot.plantedPlant = plant;
+        // 牌子使用獨立定位點，不受植物的位置與高度影響。
+        PeaInfoSign sign = Instantiate(
+            offspringSignPrefab,
+            spot.signSpawnPoint.position,
+            spot.signSpawnPoint.rotation
+        );
+
+        // 保留世界位置、旋轉與大小，再歸到種植區底下。
+        sign.transform.SetParent(spot.transform, true);
+
+        // 設定牌子資料。
+        sign.seed = seed;
+        sign.title = offspringTitle;
+        sign.observedTrait = traitText;
+
+        spot.plantedSign = sign;
+        spot.isOccupied = true;
+
+        // 成功生成後，才消耗指定的那顆種子。
+        ownedSeeds.Remove(seed);
+
+        Debug.Log(
+            $"播種完成｜種植區：{spot.spotName}｜" +
+            $"種子：{seed.seedId}｜" +
+            $"來源：{seed.firstParentName} × {seed.secondParentName}"
+        );
+
+        // 播種完成後，提示這次長出的子代分類。
+        ShowSystemHint($"播種完成！{offspringTitle}已長成");
+        // 依交配來源通知任務，不讓不同來源的植株推進錯誤階段。
+        if (seed.crossType == SeedData.CrossType.OriginalParents)
+        {
+            // 原本親代交配的種子已長成 F1。
+            missionController.OnFirstOffspringPlanted();
+        }
+        else if (seed.crossType == SeedData.CrossType.F1SelfCross)
+        {
+            // F1 自交的種子已長成 F2。
+            missionController.OnSecondOffspringPlanted();
+        }
+
+        ClosePlantingActions();
+    }
+
+    public void TryOpenOffspringSign(PeaInfoSign sign)
+    {
+        if (currentState != GameState.Exploring ||
+            sign == null)
+        {
+            return;
+        }
+
+        if (!sign.IsPlayerInRange(player))
+        {
+            ShowSystemHint("距離牌子太遠，請再靠近一點");
+            return;
+        }
+
+        if (greenhouseController == null)
+        {
+            Debug.LogWarning("尚未指定溫室資訊控制器。");
+            return;
+        }
+
+        if (greenhouseController.OpenOffspringSign(sign))
+        {
+            SetState(GameState.SignInfo);
+        }
+    }
+
+    public void OnBackpackClosed()
+    {
+        // 先隱藏背包面板，讓接下來的對話能正常顯示。
+        BackpackPanel.SetActive(false);
+
+        // 兩題都答對且正處於判讀階段時，由老師對話接手。
+        if (missionController != null &&
+            missionController.TryStartOffspringReviewDialogue())
+        {
+            return;
+        }
+
+        // 沒有對話要播放時，恢復玩家操作。
+        ReturnToExploring();
+    }
+
+    // ==========================================
+    // 依定位點的 +X 方向，設定玩家面向
+    // ==========================================
+
+    private void FacePeaPlant(Transform interactionPoint)
+    {
+        Transform movingPlayer = playerMove.agent.transform;
+
+        // 保留玩家原本的 X、Z 旋轉，
+        // 只將水平面向對齊定位空物件。
+        Vector3 rotation = movingPlayer.eulerAngles;
+        rotation.y = interactionPoint.eulerAngles.y;
+
+        movingPlayer.rotation = Quaternion.Euler(rotation);
     }
 }

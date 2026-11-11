@@ -448,6 +448,11 @@ public class InventoryManager : MonoBehaviour
                 researchRecordController
             );
         }
+        // 初始化完成後，同一次點擊就顯示新生成的面板。
+        currentOpenedPanel.SetActive(true);
+
+        // 讓面板顯示在同一容器的其他 UI 上方。
+        currentOpenedPanel.transform.SetAsLastSibling();
 
         // 顯示開啟成功訊息。
         Debug.Log("開啟物品介面：" + selectedItem.itemName);

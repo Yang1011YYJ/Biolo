@@ -37,6 +37,39 @@ public class ExperimentClipboardInteractable : MonoBehaviour
     public MissionController missionController;
     // 用來確認目前是不是 GetClipboard 任務。
 
+    public SystemHintController systemHintController;
+    public GameManager gameManager;
+    // ==========================================
+    // 快速開始：補齊紀錄板持有狀態
+    // ==========================================
+
+    public bool GrantForQuickStart()
+    {
+        if (inventoryManager == null)
+        {
+            Debug.LogError("紀錄板尚未指定 InventoryManager。");
+            return false;
+        }
+
+        // 已持有就不重複加入。
+        if (!inventoryManager.HasItemByID(clipboardItemID))
+        {
+            bool added =
+                inventoryManager.AddItemByID(clipboardItemID);
+
+            if (!added)
+            {
+                Debug.LogError("快速開始失敗：紀錄板無法加入背包。");
+                return false;
+            }
+        }
+
+        // 確定已持有後，隱藏場景中的紀錄板。
+        gameObject.SetActive(false);
+
+        // 任務進度由 GameManager 統一設定。
+        return true;
+    }
 
     // ==========================================
     // 玩家嘗試取得紀錄板
@@ -72,6 +105,8 @@ public class ExperimentClipboardInteractable : MonoBehaviour
         {
             // 按照我們目前的設計，
             // 在任務尚未觸發以前點擊紀錄板不會有任何反應。
+            gameManager.ShowSystemHint("這個物件目前無法使用");
+
             return false;
         }
 
@@ -98,6 +133,7 @@ public class ExperimentClipboardInteractable : MonoBehaviour
         // 如果玩家距離太遠。
         if (distance > interactionDistance)
         {
+            gameManager.ShowSystemHint("距離物件太遠，請再靠近一點");
             return false;
         }
 
@@ -153,7 +189,7 @@ public class ExperimentClipboardInteractable : MonoBehaviour
         // 通知 MissionController：
         // 玩家已經成功取得實驗紀錄板。
         missionController.OnClipboardObtained();
-
+        gameManager.ShowSystemHint("已取得實驗紀錄板");
 
         // --------------------------------------
         // 7. 隱藏場景中的紀錄板

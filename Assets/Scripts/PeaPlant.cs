@@ -9,9 +9,12 @@ public class PeaPlant : MonoBehaviour
     [TextArea]
     public string description;
 
-    [Tooltip("系統控制玩家採集／授粉時的站立定位點。移動只取 X、Z。")]
+    [Tooltip("交配時玩家的站立定位點。開場親代手動指定，生成子代由程式取得所屬種植區的 Interaction Point。")]
     public Transform interactionPoint;
 
     [Tooltip("這株植物目前是否可作為交配親代。")]
     public bool canBreed = true;
+
+    [Tooltip("這株植物由哪顆種子長成。開場親代甲、乙留空，由播種程式設定子代資料。")]
+    public SeedData sourceSeed;
 }

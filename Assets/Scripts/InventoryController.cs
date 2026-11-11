@@ -36,6 +36,9 @@ public class InventoryController : MonoBehaviour
     private bool hasExperimentClipboard = false;
     // 紀錄玩家目前是否已經取得實驗紀錄板。
 
+    [Header("腳本")]
+    public MissionController missionController;
+
 
     // ==========================================
     // 初始化
@@ -116,6 +119,13 @@ public class InventoryController : MonoBehaviour
         // 關閉背包 Panel。
         backpackPanel.SetActive(false);
 
+        // 嘗試接續子代判讀的老師對話。
+        if (missionController != null &&
+            missionController.TryStartOffspringReviewDialogue())
+        {
+            // 對話已開始，讓對話結束時再恢復玩家操作。
+            return;
+        }
 
         // 回到自由探索。
         gameManager.ReturnToExploring();
