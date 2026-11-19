@@ -26,14 +26,29 @@ public class GameManager : MonoBehaviour
         SeedSelection // 玩家正在選擇要播種的種子。
     }
 
+    // ==========================================
+    // 教材版本
+    // ==========================================
+
+    public enum TeachingVersion
+    {
+        Narrative,  // 敘事版。
+        Expository  // 說明版。
+    }
+
+    [Header("教材版本")]
+    [Tooltip("本次使用的教材版本。目前先完成 Narrative 敘事版；Expository 說明版會在後續接入完整流程。")][SerializeField]private TeachingVersion teachingVersion = TeachingVersion.Narrative;
+    // 提供其他腳本查詢目前版本。
+    public bool IsNarrativeVersion =>teachingVersion == TeachingVersion.Narrative;
+    [Tooltip("測試用的教材版本切換按鈕。遊戲開始後不可切換版本。")]public Button teachingVersionButton;
+    [Tooltip("版本切換按鈕上的 TMP 文字，顯示目前選定的版本。")]public TMP_Text teachingVersionButtonText;
+
 
     [Header("目前狀態")]
-
     public GameState currentState; // 紀錄現在處於哪一個流程狀態。
 
 
     [Header("玩家")]
-
     public Move playerMove; // 玩家身上的移動程式。
     public Transform player; // 玩家本身的 Transform。
     [Tooltip("玩家顯示物件")] public GameObject playerVisual; // 要隱藏／顯示的玩家模型或圖片物件
@@ -52,65 +67,37 @@ public class GameManager : MonoBehaviour
     [Tooltip("場景中的電腦設備")]public GameObject computerObject;
 
     [Header("交配演出")]
-
-    [Tooltip("抵達每株親代後停留的秒數。")]
-    [Min(0f)]
-    public float parentVisitWait = 1f;
-
-    [Tooltip("每一段系統移動允許的最長秒數。超時會中止並恢復操作。")]
-    [Min(1f)]
-    public float systemMoveTimeout = 30f;
-
+    [Tooltip("抵達每株親代後停留的秒數。")][Min(0f)]public float parentVisitWait = 1f;
+    [Tooltip("每一段系統移動允許的最長秒數。超時會中止並恢復操作。")][Min(1f)]public float systemMoveTimeout = 30f;
     // 防止交配演出重複開始。
     private bool isBreedingSequenceRunning;
-
     // 記錄單段系統移動是否成功抵達。
     private bool systemMoveSucceeded;
-
     // 按下開始交配時的玩家位置。
     private Vector3 breedingReturnPosition;
-
     //[Tooltip("目前持有的第一子代種子數量。純品系高莖與矮莖交配成功後增加。")]
     //[Min(0)]
     //public int firstGenerationSeedCount = 0;
+
     [Header("種子與播種")]
-
-    [Tooltip("目前持有的種子。每次交配新增一筆，播種時移除選中的那筆。")]
-    public List<SeedData> ownedSeeds = new List<SeedData>();
-
-    [Tooltip("顯示種子清單與確認播種按鈕的面板控制器。")]
-    public SeedSelectionPanel seedSelectionPanel;
-
-    [Tooltip("目前甲、乙交配所得 F1 的高莖植株 Prefab。")]
-    public GameObject firstGenerationPlantPrefab;
-    [Tooltip("第二次交配產生矮莖子代時使用的植株 Prefab，根物件須掛上 PeaPlant。")]
-    public GameObject shortOffspringPlantPrefab;
-
+    [Tooltip("目前持有的種子。每次交配新增一筆，播種時移除選中的那筆。")]public List<SeedData> ownedSeeds = new List<SeedData>();
+    [Tooltip("顯示種子清單與確認播種按鈕的面板控制器。")]public SeedSelectionPanel seedSelectionPanel;
+    [Tooltip("目前甲、乙交配所得 F1 的高莖植株 Prefab。")]public GameObject firstGenerationPlantPrefab;
+    [Tooltip("第二次交配產生矮莖子代時使用的植株 Prefab，根物件須掛上 PeaPlant。")]public GameObject shortOffspringPlantPrefab;
     // 保留原本讀取數量的名稱，既有選單呼叫不用全部修改。
     public int firstGenerationSeedCount => ownedSeeds.Count;
-    [Tooltip("下一顆種子的顯示編號。播種消耗種子後不會倒退，避免名稱重複。")]
-    [SerializeField, Min(1)]
-    private int nextSeedNumber = 1;
+    [Tooltip("下一顆種子的顯示編號。播種消耗種子後不會倒退，避免名稱重複。")][SerializeField, Min(1)]private int nextSeedNumber = 1;
 
     [Header("可交配植株")]
+    [Tooltip("目前可供選擇的植株。開場指定甲、乙，播種後由程式加入子代。")]public List<PeaPlant> availableParents = new List<PeaPlant>();
+    [Tooltip("開場的矮莖親代乙，用來驗證第二次交配組合。")]public PeaPlant shortOriginalParent;
 
-    [Tooltip("目前可供選擇的植株。開場指定甲、乙，播種後由程式加入子代。")]
-    public List<PeaPlant> availableParents = new List<PeaPlant>();
-
-    [Tooltip("開場的矮莖親代乙，用來驗證第二次交配組合。")]
-    public PeaPlant shortOriginalParent;
     [Header("植株生成高度")]
-
-    [Tooltip("高莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]
-    public float tallPlantWorldY= 31.87150001525879f;
-
-    [Tooltip("矮莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]
-    public float shortPlantWorldY= 30.60569953918457f;
+    [Tooltip("高莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]public float tallPlantWorldY= 31.87150001525879f;
+    [Tooltip("矮莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]public float shortPlantWorldY= 30.60569953918457f;
 
     [Header("展示與快速測試")]
-
-    [Tooltip("開始畫面的階段選單：0 正常開始、1 直接交配。未指定時走正常流程。")]
-    public TMP_Dropdown startupStageDropdown;
+    [Tooltip("開始畫面的階段選單：0 正常開始、1 直接交配。未指定時走正常流程。")]public TMP_Dropdown startupStageDropdown;
 
     [Header("腳本")]
     public FadeController fadeController;
@@ -157,6 +144,8 @@ public class GameManager : MonoBehaviour
 
         // 設定初始狀態。
         SetState(GameState.PreStart);
+        // 依 Inspector 設定，顯示目前教材版本。
+        RefreshTeachingVersionButton();
     }
 
     private void StartGame()
@@ -350,33 +339,34 @@ public class GameManager : MonoBehaviour
     // 開場劇情
     // ==========================================
 
+    // ==========================================
+    // 開場：建立研究委託
+    // ==========================================
+
     public void StartIntro()
     {
-        // 將整體流程切換成開場劇情狀態。
+        // 開場期間暫停玩家操作。
         SetState(GameState.Intro);
 
-
-        // 使用共用對話系統播放開場內容。
+        // 目前先完成敘事版開場。
         dialogueControll.OpenDialogue(
-            "指導老師", // 如果開場沒有特定說話者，名稱可以先留空。
-
-            missionController.teacherVisual, // 如果開場沒有角色圖片，可以先不指定。
+            "指導老師",
+            missionController.teacherVisual,
 
             new string[]
             {
-            // 第一段開場內容。
-            "歡迎來到研究中心。",
+            "歡迎來到研究中心。今天，你將以實習生的身分，參與第一項豌豆研究。",
 
-            // 第二段開場內容。
-            "今天開始，你將以實習生的身分參與研究工作。",
+            "中心收到兩株純品系豌豆，一株高莖，一株矮莖。我們需要釐清，這兩種性狀會如何出現在牠們的子代身上。",
 
-            // 第三段開場內容。
-            "先到研究室的電腦看看今天的實習任務吧。"
+            "這次由你負責觀察、提出假設，再透過交配實驗蒐集證據，完成一份性狀判斷報告。",
+
+            "你的第一個想法可以保留，也可以隨著新發現修正。報告需要說明，你的判斷有哪些證據支持。",
+
+            "先到研究室的電腦查看委託內容。裡面也有孟德爾的研究資料，可以作為這次實驗的參考。"
             },
 
             OnIntroDialogueFinished
-        // 整段開場對話播放完成後，
-        // 自動執行這個函式。
         );
     }
 
@@ -487,6 +477,8 @@ public class GameManager : MonoBehaviour
             currentState == GameState.BreedingSequence;
 
         playerMove.SetMovementEnabled(movementEnabled);
+        // 狀態改變時，同步版本按鈕是否可以操作。
+        RefreshTeachingVersionButton();
     }
 
 
@@ -1391,5 +1383,45 @@ public class GameManager : MonoBehaviour
         rotation.y = interactionPoint.eulerAngles.y;
 
         movingPlayer.rotation = Quaternion.Euler(rotation);
+    }
+
+    // ==========================================
+    // 測試用：切換教材版本
+    // ==========================================
+
+    public void ToggleTeachingVersion()
+    {
+        // 開始遊戲後，不允許中途切換教材內容。
+        if (currentState != GameState.PreStart)
+        {
+            return;
+        }
+
+        teachingVersion = IsNarrativeVersion
+            ? TeachingVersion.Expository
+            : TeachingVersion.Narrative;
+
+        RefreshTeachingVersionButton();
+    }
+
+
+    // ==========================================
+    // 更新版本按鈕
+    // ==========================================
+
+    private void RefreshTeachingVersionButton()
+    {
+        if (teachingVersionButtonText != null)
+        {
+            teachingVersionButtonText.text = IsNarrativeVersion
+                ? "目前：敘事版\n"+"點擊切換"
+                : "目前：說明版\n"+"點擊切換";
+        }
+
+        if (teachingVersionButton != null)
+        {
+            teachingVersionButton.interactable =
+                currentState == GameState.PreStart;
+        }
     }
 }
