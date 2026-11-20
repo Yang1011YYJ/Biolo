@@ -1,9 +1,29 @@
 
 using TMPro;
-using UnityEngine; // 引入 Unity 基本功能。
+using UnityEngine;
+using UnityEngine.UI; // 引入 Unity 基本功能。
 
 public class ComputerInteractable : MonoBehaviour
 {
+    public enum ComputerSection
+    {
+        Story,
+        Mission,
+        Report
+    }
+
+    [Header("電腦分頁")]
+    [Tooltip("故事頁面，依閱讀順序指定。")]public GameObject[] storyPages;
+    [Tooltip("任務頁面，依閱讀順序指定。")]public GameObject[] missionPages;
+    [Tooltip("報告頁面，依閱讀順序指定。")]public GameObject[] reportPages;
+    [Tooltip("所有側欄共用的上一頁按鈕。")]public Button previousPageButton;
+    [Tooltip("所有側欄共用的下一頁按鈕。")]public Button nextPageButton;
+    [Tooltip("所有側欄共用的頁碼文字。")]public TMP_Text pageNumberText;
+    [Tooltip("影片控制器，只負責播放與觀看紀錄。")]public StoryVideoController storyVideoController;
+    [Tooltip("故事分類中，影片頁的索引。第一頁填 0。")][Min(0)]public int storyVideoPageIndex = 0;
+    [Tooltip("目前選取的側欄分類，由程式更新。")][SerializeField]private ComputerSection currentSection = ComputerSection.Mission;
+    [Tooltip("目前分類的頁面索引，從 0 開始，由程式更新。")][SerializeField]private int currentPageIndex;
+
     [Header("互動設定")]
     public float interactionDistance = 2.5f; // 可以操作電腦的最大距離。
 
@@ -11,6 +31,10 @@ public class ComputerInteractable : MonoBehaviour
     [Tooltip("實習任務按鈕所對應的內容")]public GameObject missionContent; // 顯示實習任務的區域。
     [Tooltip("故事按鈕所對應的內容")]public GameObject storyContent; // 顯示故事的區域。
     [Tooltip("實驗報告按鈕所對應的內容")]public GameObject reportContent; // 顯示實驗報告的區域。
+
+    [Header("任務分頁")]
+    [Tooltip("任務第二頁的研究問題與方法文字。")]public TMP_Text researchInfoText;
+    [Tooltip("任務控制器，用來讀取目前任務階段。")]public MissionController missionController;
 
     [Header("教材內容")]
     [Tooltip("整體流程控制器，用來讀取目前使用的教材版本。")]public GameManager gameManager;
@@ -53,28 +77,31 @@ public class ComputerInteractable : MonoBehaviour
 
 
     // ==========================================
-    // 開啟電腦時，更新並顯示任務頁
+    // 開啟電腦：預設顯示任務第一頁
     // ==========================================
 
     public void ResetContent()
     {
-        // 更新任務文字，並顯示任務頁。
         ShowMissionContent();
     }
 
 
     // ==========================================
-    // 顯示任務頁
+    // 側欄
     // ==========================================
 
     public void ShowMissionContent()
     {
-        // 每次打開都依目前版本重新整理內容。
         RefreshMissionContent();
 
-        // 沿用原本的頁面切換功能。
-        ShowContent(missionContent);
+        if (missionController != null && researchInfoText != null)
+        {
+            RefreshResearchInfo();
+        }
+
+        OpenSection(ComputerSection.Mission);
     }
+
 
 
     // ==========================================
@@ -83,15 +110,8 @@ public class ComputerInteractable : MonoBehaviour
 
     public void ShowStoryContent()
     {
-        // 故事頁啟用後，由 StoryPageController
-        // 自動顯示第一頁，不自動播放影片。
-        ShowContent(storyContent);
+        OpenSection(ComputerSection.Story);
     }
-
-
-    // ==========================================
-    // 顯示實驗報告
-    // ==========================================
 
     // ==========================================
     // 顯示實驗報告頁面
@@ -99,77 +119,211 @@ public class ComputerInteractable : MonoBehaviour
 
     public void ShowReportContent()
     {
-        // 先關閉其他電腦內容。
-        HideAllContent();
+        OpenSection(ComputerSection.Report);
 
-        // 開啟實驗報告內容。
-        reportContent.SetActive(true);
-
-        // 如果有指定實驗報告控制器。
+        // 保留原本的報告資料更新。
         if (experimentReportController != null)
         {
-            // 每次玩家打開實驗報告，
-            // 都強制重新讀取目前的研究資料。
             experimentReportController.RefreshReport();
-
-            // 測試目前是否真的有執行刷新。
-            Debug.Log("已重新整理實驗報告。");
-        }
-        else
-        {
-            // 如果沒有指定，就提醒我們 Inspector 漏接。
-            Debug.LogError(
-                "ComputerInteractable 尚未指定 ExperimentReportController。"
-            );
         }
     }
 
-
     // ==========================================
-    // 通用顯示內容
+    // 切換分類
     // ==========================================
 
-    private void ShowContent(GameObject targetContent)
+    private void OpenSection(ComputerSection section)
     {
-        // 先關閉所有中央內容。
-        HideAllContent();
-
-        // 確認目標內容存在。
-        if (targetContent != null)
+        // 先暫停影片，保留播放位置。
+        if (storyVideoController != null)
         {
-            // 顯示指定的內容。
-            targetContent.SetActive(true);
-        }
-        else
-        {
-            // 如果沒有指定內容，顯示警告。
-            Debug.LogWarning("電腦中央內容尚未指定。");
-        }
-    }
-
-
-    // ==========================================
-    // 關閉所有中央內容
-    // ==========================================
-
-    private void HideAllContent()
-    {
-        // 關閉實習任務內容。
-        if (missionContent != null)
-        {
-            missionContent.SetActive(false);
+            storyVideoController.SetPageVisible(false);
         }
 
-        // 關閉研究故事內容。
+        currentSection = section;
+        currentPageIndex = 0;
+
         if (storyContent != null)
         {
-            storyContent.SetActive(false);
+            storyContent.SetActive(section == ComputerSection.Story);
         }
 
-        // 關閉實驗報告內容。
+        if (missionContent != null)
+        {
+            missionContent.SetActive(section == ComputerSection.Mission);
+        }
+
         if (reportContent != null)
         {
-            reportContent.SetActive(false);
+            reportContent.SetActive(section == ComputerSection.Report);
+        }
+
+        ApplyCurrentPage();
+    }
+
+    // ==========================================
+    // 取得目前分類的頁面清單
+    // ==========================================
+
+    private GameObject[] GetCurrentPages()
+    {
+        switch (currentSection)
+        {
+            case ComputerSection.Story:
+                return storyPages;
+
+            case ComputerSection.Mission:
+                return missionPages;
+
+            case ComputerSection.Report:
+                return reportPages;
+
+            default:
+                return null;
+        }
+    }
+
+    // ==========================================
+    // 共用上一頁／下一頁
+    // ==========================================
+
+    public void PreviousPage()
+    {
+        if (currentPageIndex <= 0)
+        {
+            return;
+        }
+
+        currentPageIndex--;
+        ApplyCurrentPage();
+    }
+
+
+    public void NextPage()
+    {
+        GameObject[] pages = GetCurrentPages();
+
+        if (pages == null ||
+            currentPageIndex >= pages.Length - 1 ||
+            IsNextPageLocked())
+        {
+            return;
+        }
+
+        currentPageIndex++;
+        ApplyCurrentPage();
+    }
+
+
+    // ==========================================
+    // 顯示目前頁面
+    // ==========================================
+
+    private void ApplyCurrentPage()
+    {
+        GameObject[] pages = GetCurrentPages();
+
+        if (pages == null || pages.Length == 0)
+        {
+            if (storyVideoController != null)
+            {
+                storyVideoController.SetPageVisible(false);
+            }
+
+            RefreshNavigation();
+            return;
+        }
+
+        currentPageIndex = Mathf.Clamp(
+            currentPageIndex,
+            0,
+            pages.Length - 1
+        );
+
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i] != null)
+            {
+                pages[i].SetActive(i == currentPageIndex);
+            }
+        }
+
+        // 明確告訴影片控制器：影片頁現在是否可見。
+        if (storyVideoController != null)
+        {
+            bool videoVisible =
+                currentSection == ComputerSection.Story &&
+                currentPageIndex == storyVideoPageIndex &&
+                pages[currentPageIndex] != null &&
+                pages[currentPageIndex].activeInHierarchy;
+
+            storyVideoController.SetPageVisible(videoVisible);
+        }
+
+        RefreshNavigation();
+    }
+
+
+    // ==========================================
+    // 首次影片限制
+    // ==========================================
+
+    private bool IsNextPageLocked()
+    {
+        if (currentSection != ComputerSection.Story ||
+            currentPageIndex != storyVideoPageIndex)
+        {
+            return false;
+        }
+
+        // 缺少影片控制器時，也不放行首次觀看限制。
+        return storyVideoController == null ||
+               !storyVideoController.HasCompletedFirstViewing;
+    }
+
+
+    // ==========================================
+    // 更新頁碼與按鈕
+    // ==========================================
+
+    private void RefreshNavigation()
+    {
+        GameObject[] pages = GetCurrentPages();
+        int count = pages != null ? pages.Length : 0;
+
+        if (previousPageButton != null)
+        {
+            previousPageButton.interactable =
+                count > 0 && currentPageIndex > 0;
+        }
+
+        if (nextPageButton != null)
+        {
+            nextPageButton.interactable =
+                count > 0 &&
+                currentPageIndex < count - 1 &&
+                !IsNextPageLocked();
+        }
+
+        if (pageNumberText != null)
+        {
+            pageNumberText.text = count > 0
+                ? $"{currentPageIndex + 1} / {count}"
+                : "0 / 0";
+        }
+    }
+
+
+    // ==========================================
+    // 影片看完後，即時更新下一頁狀態
+    // ==========================================
+
+    private void Update()
+    {
+        if (gameManager != null &&
+            gameManager.currentState == GameManager.GameState.Computer)
+        {
+            RefreshNavigation();
         }
     }
 
@@ -239,5 +393,96 @@ public class ComputerInteractable : MonoBehaviour
         }
     }
 
+    // ==========================================
+    // 更新任務第二頁的研究資訊
+    // ==========================================
 
+    private void RefreshResearchInfo()
+    {
+        switch (missionController.currentMissionStep)
+        {
+            case MissionController.MissionStep.ReadMission:
+            case MissionController.MissionStep.GoToGreenhouse:
+            case MissionController.MissionStep.ObserveParents:
+            case MissionController.MissionStep.MakeHypothesis:
+            case MissionController.MissionStep.RecordHypothesis:
+            case MissionController.MissionStep.GetClipboard:
+
+                researchInfoText.text =
+                    "【研究問題】\n" +
+                    "純品系高莖與矮莖豌豆交配後，" +
+                    "子代會呈現哪些性狀？\n\n" +
+
+                    "【實驗方法】\n" +
+                    "先觀察親代甲、乙的品系與莖高，" +
+                    "提出並記錄初步假設，" +
+                    "再透過交配與培育觀察子代。\n\n" +
+
+                    "【需要記錄的資料】\n" +
+                    "親代的品系、莖高，以及實驗前的假設。\n\n" +
+
+                    "目前的假設需要後續子代的觀察結果來檢驗。";
+
+                break;
+
+            case MissionController.MissionStep.ReadyForExperiment:
+            case MissionController.MissionStep.ObserveFirstOffspring:
+
+                researchInfoText.text =
+                    "【研究問題】\n" +
+                    "純品系高莖與矮莖親代交配後，" +
+                    "第一子代會呈現什麼莖高？\n\n" +
+
+                    "【實驗方法】\n" +
+                    "讓親代甲與親代乙交配，" +
+                    "播種取得的種子，查看第一子代資訊牌。\n\n" +
+
+                    "【需要記錄的資料】\n" +
+                    "親代來源與第一子代的莖高。\n\n" +
+
+                    "【比較重點】\n" +
+                    "比較觀察結果與原先假設，" +
+                    "整理已有的證據與尚待解答的問題。";
+
+                break;
+
+            case MissionController.MissionStep.SelfCrossF1:
+            case MissionController.MissionStep.SowF2Seed:
+            case MissionController.MissionStep.ObserveSecondOffspring:
+
+                researchInfoText.text = gameManager.IsNarrativeVersion
+                    ? "【委託中的待解問題】\n" +
+                      "你培育的第一子代呈現高莖，但它的親代之一是矮莖。" +
+                      "矮莖沒有出現在這株第一子代，是否代表相關遺傳訊息已經消失？\n\n" +
+
+                      "【接續調查】\n" +
+                      "讓同一株第一子代自花授粉，培育第二子代，" +
+                      "追查矮莖是否會再次出現。\n\n" +
+
+                      "【報告需要的證據】\n" +
+                      "記錄第二子代的性狀與親代來源，" +
+                      "再與第一子代及最初假設比較。"
+
+                    : "【研究問題】\n" +
+                      "第一子代呈現高莖時，是否仍可能保有與矮莖相關的遺傳訊息？" +
+                      "第二子代是否會出現矮莖？\n\n" +
+
+                      "【實驗方法】\n" +
+                      "讓同一株第一子代自花授粉，取得種子並培育第二子代。\n\n" +
+
+                      "【觀察與比較】\n" +
+                      "記錄第二子代的性狀與親代來源，" +
+                      "再與第一子代及最初假設比較。";
+
+                break;
+
+            default:
+                // 後續階段的內容隨教材製作補上。
+                researchInfoText.text =
+                    "本階段研究資訊尚在製作中，" +
+                    "請依目前任務提示進行。";
+
+                break;
+        }
+    }
 }

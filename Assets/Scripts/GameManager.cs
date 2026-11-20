@@ -43,6 +43,11 @@ public class GameManager : MonoBehaviour
     [Tooltip("測試用的教材版本切換按鈕。遊戲開始後不可切換版本。")]public Button teachingVersionButton;
     [Tooltip("版本切換按鈕上的 TMP 文字，顯示目前選定的版本。")]public TMP_Text teachingVersionButtonText;
 
+    [Header("開發測試")]
+    [Tooltip("由開始介面的按鈕設定。啟用後略過首次強制觀看、閱讀與接受任務的關閉限制；不會自動完成任務。")][SerializeField]private bool isTestMode = false;
+    // 其他程式統一從這裡查詢是否為測試模式。
+    public bool IsTestMode => isTestMode;
+    [Tooltip("開始介面上測試開關按鈕的 TMP 文字，顯示「測試：開／關」。")]public TMP_Text testModeButtonText;
 
     [Header("目前狀態")]
     public GameState currentState; // 紀錄現在處於哪一個流程狀態。
@@ -115,6 +120,7 @@ public class GameManager : MonoBehaviour
     [Tooltip("播種成功後生成的資訊牌子 Prefab，需掛有 PeaInfoSign。")]
     public PeaInfoSign offspringSignPrefab;
     [Tooltip("場景中可拾取的實驗紀錄板。快速開始時會將它加入背包並隱藏。")]public ExperimentClipboardInteractable experimentClipboard;
+    [Tooltip("電腦中的故事頁控制器，用來檢查首次觀看及關閉後重設影片進度。")]public StoryVideoController StoryVideoController;
 
 
     private void Start()
@@ -139,6 +145,7 @@ public class GameManager : MonoBehaviour
         // 關閉電腦介面。
         computerPanel.SetActive(false);
 
+
         //關閉背包介面。
         BackpackPanel.SetActive(false);
 
@@ -146,10 +153,13 @@ public class GameManager : MonoBehaviour
         SetState(GameState.PreStart);
         // 依 Inspector 設定，顯示目前教材版本。
         RefreshTeachingVersionButton();
+        //測試階段按鈕
+        RefreshTestModeButton();
     }
 
     private void StartGame()
     {
+
         // 測試 StartGame 是否真的有被執行。
         //Debug.LogError("★★★ StartGame 有執行 ★★★");
 
@@ -242,6 +252,16 @@ public class GameManager : MonoBehaviour
 
     private void StartFromTestStage()
     {
+
+        // 快速開始必須能補齊影片觀看狀態。
+        if (StoryVideoController == null)
+        {
+            Debug.LogError(
+                "快速開始失敗：尚未指定 StoryVideoController。"
+            );
+
+            return;
+        }
         // ======================================
         // 先確認快速開始需要的元件
         // ======================================
@@ -305,9 +325,13 @@ public class GameManager : MonoBehaviour
         }
 
         // ======================================
-        // 顯示場景、關閉開始介面
+        // 快速開始：補齊影片狀態，再顯示場景
         // ======================================
 
+        // 只有直接交配模式會執行這次補齊。
+        StoryVideoController.CompleteViewingForQuickStart();
+
+        // 顯示玩家與場景設備。
         StartGame();
 
         BlackPanel.SetActive(false);
@@ -438,27 +462,57 @@ public class GameManager : MonoBehaviour
     // 這個函式給電腦 Panel 的關閉按鈕呼叫。
     public void CloseComputer()
     {
-        // 關閉電腦介面。
-        computerPanel.SetActive(false);
-
-
-        // 通知 MissionController：
-        // 玩家剛剛把電腦關掉了。
-        bool missionDialogueStarted =
-            missionController.OnComputerClosed();
-
-
-        // 如果 MissionController 已經開啟任務對話，
-        // 就不要把玩家切回自由探索。
-        if (missionDialogueStarted)
+        // 只處理正在操作電腦時的關閉要求。
+        if (currentState != GameState.Computer)
         {
-            // 任務對話會自己維持 MissionDialogue 狀態。
             return;
         }
 
+        // 任務尚未接受時，不能離開電腦。
+        if (missionController == null)
+        {
+            Debug.LogError("GameManager 尚未指定 MissionController。");
+            return;
+        }
 
-        // 如果這次沒有任何任務劇情，
-        // 就正常回到自由探索。
+        if (!IsTestMode && !missionController.missionAccepted)
+        {
+            ShowSystemHint(
+                "請到「任務」第二頁查看研究問題與方法，並接受任務"
+            );
+
+            return;
+        }
+
+        if (StoryVideoController == null)
+        {
+            Debug.LogError("GameManager 尚未指定 StoryVideoController。");
+            ShowSystemHint("故事頁設定不完整，請確認設定");
+            return;
+        }
+
+        // 第一次必須完整觀看，不能用關閉電腦跳過。
+        if (!IsTestMode && !StoryVideoController.HasCompletedFirstViewing)
+        {
+            ShowSystemHint("請先到「故事」完整觀看一次影片喔！");
+            return;
+        }
+
+        // 先隱藏介面，觸發故事頁暫停。
+        computerPanel.SetActive(false);
+
+        // 再重設位置，避免暫停時將舊位置寫回。
+        StoryVideoController.ResetAfterComputerClosed();
+
+        // 沿用原本的任務流程。
+        bool missionDialogueStarted =
+            missionController.OnComputerClosed();
+
+        if (missionDialogueStarted)
+        {
+            return;
+        }
+
         ReturnToExploring();
     }
 
@@ -1422,6 +1476,32 @@ public class GameManager : MonoBehaviour
         {
             teachingVersionButton.interactable =
                 currentState == GameState.PreStart;
+        }
+    }
+
+    // ===========================
+    //測試按鈕
+    // ===========================
+
+    // 給測試開關按鈕呼叫。
+    public void ToggleTestMode()
+    {
+        // 僅允許在開始遊戲前切換。
+        if (currentState != GameState.PreStart)
+        {
+            return;
+        }
+
+        isTestMode = !isTestMode;
+        RefreshTestModeButton();
+    }
+
+    private void RefreshTestModeButton()
+    {
+        if (testModeButtonText != null)
+        {
+            testModeButtonText.text =
+                isTestMode ? "測試：開" : "測試：關";
         }
     }
 }
