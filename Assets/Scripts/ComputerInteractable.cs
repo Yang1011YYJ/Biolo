@@ -5,32 +5,23 @@ using UnityEngine; // 引入 Unity 基本功能。
 public class ComputerInteractable : MonoBehaviour
 {
     [Header("互動設定")]
-
     public float interactionDistance = 2.5f; // 可以操作電腦的最大距離。
 
-
     [Header("中央內容區")]
-
-    [Tooltip("實習任務按鈕所對應的內容")]
-    public GameObject missionContent; // 顯示實習任務的區域。
-    [Tooltip("故事按鈕所對應的內容")]
-    public GameObject storyContent; // 顯示故事的區域。
-
-    [Tooltip("實驗報告按鈕所對應的內容")]
-    public GameObject reportContent; // 顯示實驗報告的區域。
+    [Tooltip("實習任務按鈕所對應的內容")]public GameObject missionContent; // 顯示實習任務的區域。
+    [Tooltip("故事按鈕所對應的內容")]public GameObject storyContent; // 顯示故事的區域。
+    [Tooltip("實驗報告按鈕所對應的內容")]public GameObject reportContent; // 顯示實驗報告的區域。
 
     [Header("教材內容")]
+    [Tooltip("整體流程控制器，用來讀取目前使用的教材版本。")]public GameManager gameManager;
+    [Tooltip("電腦任務頁的標題文字，不是任務接受狀態文字。")] public TMP_Text missionTitleText;
+    [Tooltip("電腦任務頁的委託或實驗說明文字。")]public TMP_Text missionDescriptionText;
 
-    [Tooltip("整體流程控制器，用來讀取目前使用的教材版本。")]
-    public GameManager gameManager;
+    [Header("研究背景頁")]
+    [Tooltip("研究背景頁的標題文字，須放在 storyContent 底下。")]public TMP_Text storyTitleText;
+    [Tooltip("研究背景頁的內文，建議放在 Scroll View 的 Content 底下。")]public TMP_Text storyDescriptionText;
 
-    [Tooltip("電腦任務頁的標題文字，不是任務接受狀態文字。")]
-    public TMP_Text missionTitleText;
 
-    [Tooltip("電腦任務頁的委託或實驗說明文字。")]
-    public TMP_Text missionDescriptionText;
-
-    
 
     [Header("腳本")]
     public ExperimentReportController experimentReportController;
@@ -87,12 +78,13 @@ public class ComputerInteractable : MonoBehaviour
 
 
     // ==========================================
-    // 顯示研究故事
+    // 開啟兩版共用的故事頁
     // ==========================================
 
     public void ShowStoryContent()
     {
-        // 顯示研究故事內容。
+        // 故事頁啟用後，由 StoryPageController
+        // 自動顯示第一頁，不自動播放影片。
         ShowContent(storyContent);
     }
 
@@ -246,4 +238,6 @@ public class ComputerInteractable : MonoBehaviour
                 "了解研究問題、實驗方法與觀察結果。";
         }
     }
+
+
 }
