@@ -1,6 +1,7 @@
 using TMPro; // 引入 TextMeshPro，用來修改任務接受狀態文字。
 using UnityEngine;
 using UnityEngine.UI; // 引入 Unity 基本功能。
+using System.Collections;
 
 public class MissionController : MonoBehaviour
 {
@@ -23,7 +24,11 @@ public class MissionController : MonoBehaviour
         ObserveSecondOffspring, // 查看第二子代的資訊牌。
         ReviewOffspringData, // 開啟實驗紀錄板，比較多株子代的結果。
         ReviewHypothesis,//老師引導玩家比對原本的假設
-        ReportSubmitted
+        ReportSubmitted,
+        WaitingReportReply,
+        ReportReplyReady,
+        ReturnToUpdatedSigns, // 返回溫室查看更新後的資料。
+        StageACompleted      // A 階段已完成。
     }
 
 
@@ -64,6 +69,35 @@ public class MissionController : MonoBehaviour
     // 場景中的實驗紀錄板位置。
     public Transform experimentTarget;
     // 正式進行交配實驗的位置。
+
+    [Header("報告回覆")]
+
+    [Tooltip("玩家提交報告並關閉電腦後，等待回覆的秒數。")][Min(0f)] public float reportReplyDelay = 5f;
+    // 提供報告頁查詢是否已收到回覆。
+    public bool HasReportReply =>
+        currentMissionStep == MissionStep.ReportReplyReady;
+    // 已收到回覆，且本次提交的判斷正確。
+    public bool HasPassedReport =>
+    researchRecordController != null &&
+    researchRecordController.SubmittedHypothesis ==
+        ResearchRecordController.HypothesisType.TallStemDominant &&
+    (
+        currentMissionStep == MissionStep.ReportReplyReady ||
+        currentMissionStep == MissionStep.ReturnToUpdatedSigns ||
+        currentMissionStep == MissionStep.StageACompleted
+    );
+
+    // 看完實驗解說並關閉電腦後，牌子才顯示更新資料。
+    public bool AreSignResultsUnlocked =>
+        currentMissionStep == MissionStep.ReturnToUpdatedSigns ||
+        currentMissionStep == MissionStep.StageACompleted;
+
+    // 已收到回覆，但需要重新判斷。
+    public bool HasRejectedReport =>
+        currentMissionStep == MissionStep.ReportReplyReady &&
+        researchRecordController != null &&
+        researchRecordController.SubmittedHypothesis ==
+            ResearchRecordController.HypothesisType.ShortStemDominant;
 
 
     // ==========================================
@@ -148,7 +182,7 @@ public class MissionController : MonoBehaviour
                 1f
             );
 
-        
+
         // 任務一旦接受，
         // 這個按鈕就不能再按。
         acceptMissionButton.interactable = false;
@@ -168,6 +202,18 @@ public class MissionController : MonoBehaviour
 
     public bool OnComputerClosed()
     {
+        // 提交報告後，真正關閉電腦才開始等待。
+        if (currentMissionStep == MissionStep.ReportSubmitted)
+        {
+            // 先切換階段，避免反覆開關電腦重複計時。
+            SetMissionStep(MissionStep.WaitingReportReply);
+
+            StartCoroutine(WaitForReportReply());
+
+            // 沒有播放對話，讓 GameManager 正常恢復探索。
+            return false;
+        }
+
         // 如果玩家根本還沒接受任務。
         if (!missionAccepted)
         {
@@ -547,6 +593,44 @@ public class MissionController : MonoBehaviour
                 // 提醒玩家關閉電腦，接續等待流程。
                 missionHintController.ShowHint("報告已提交，請關閉電腦等待研究中心回覆");
                 break;
+
+            case MissionStep.WaitingReportReply:
+
+                missionHintController.ShowHint(
+                    gameManager.IsNarrativeVersion
+                        ? "報告已送出，等待研究中心回覆"
+                        : "判斷已提交，等待系統檢核結果"
+                );
+
+                break;
+
+            case MissionStep.ReportReplyReady:
+
+                missionHintController.ShowHint(
+                    gameManager.IsNarrativeVersion
+                        ? "收到研究中心回覆，前往電腦的報告頁查看"
+                        : "檢核結果已更新，前往電腦的報告頁查看"
+                );
+
+                break;
+
+            case MissionStep.ReturnToUpdatedSigns:
+
+                missionHintController.ShowHint(
+                    "返回溫室，查看任一塊更新後的豌豆資訊牌"
+                );
+
+                break;
+
+            case MissionStep.StageACompleted:
+
+                missionHintController.ShowHint(
+                    gameManager.IsNarrativeVersion
+                        ? "豌豆性狀調查委託已完成"
+                        : "豌豆性狀遺傳實驗已完成"
+                );
+
+                break;
         }
     }
 
@@ -681,6 +765,30 @@ public class MissionController : MonoBehaviour
             case MissionStep.ReviewHypothesis:
                 // 將任務箭頭指向研究室電腦。
                 missionTargetIndicator.SetTarget(computerTarget);
+                break;
+
+            case MissionStep.WaitingReportReply:
+
+                // 等待期間沒有需要前往的目標。
+                missionTargetIndicator.ClearTarget();
+
+                break;
+
+            case MissionStep.ReportReplyReady:
+
+                // 收到回覆後，重新指向電腦。
+                missionTargetIndicator.SetTarget(computerTarget);
+
+                break;
+
+            case MissionStep.ReturnToUpdatedSigns:
+
+                missionTargetIndicator.SetTarget(greenhouseTarget);
+                break;
+
+            case MissionStep.StageACompleted:
+
+                missionTargetIndicator.ClearTarget();
                 break;
         }
     }
@@ -889,17 +997,17 @@ public class MissionController : MonoBehaviour
             "指導老師",
             teacherVisual,
             new string[]
-{
-    "第二子代已經長出來了，你也記下了這株植物的性狀。",
+            {
+                "第二子代已經長出來了，你也記下了這株植物的性狀。",
 
-    "不過，我們還不能只憑一株植物，就回答整批子代有哪些性狀、各有多少。",
+                "不過，我們還不能只憑一株植物，就回答整批子代有哪些性狀、各有多少。",
 
-    "研究中心提供了一份多株培育紀錄。把它和你的觀察放在一起，看看第一子代沒有出現的矮莖，是否出現在第二子代。",
+                "研究中心提供了一份多株培育紀錄。把它和你的觀察放在一起，看看第一子代沒有出現的矮莖，是否出現在第二子代。",
 
-    "這會幫助我們回答先前留下的問題：沒有表現出來的性狀，是否就代表相關遺傳訊息消失了？",
+                "這會幫助我們回答先前留下的問題：沒有表現出來的性狀，是否就代表相關遺傳訊息消失了？",
 
-    "請從背包開啟實驗紀錄板，比較兩代資料，完成性狀與數量關係的兩道判讀題。"
-},
+                "請從背包開啟實驗紀錄板，比較兩代資料，完成性狀與數量關係的兩道判讀題。"
+            },
             () =>
             {
                 // 對話結束後，恢復自由操作。
@@ -932,21 +1040,15 @@ public class MissionController : MonoBehaviour
             "指導老師",
             teacherVisual,
             new string[]
-{
-    "你已經整理出兩代的差異：這份資料中的第一子代都是高莖；第二子代則同時出現高莖與矮莖，高莖與矮莖的株數比是三比一。",
+            {
+                "你已經整理出兩代的差異，記錄版裡可以看到兩次實驗中，兩種類型性狀的植株數量。",
 
-    "現在，我們來說明報告中的兩個名詞：顯性與隱性。",
+                $"你最初記錄的假設是：「{researchRecordController.GetHypothesisDescription()}」。",
 
-    "在這個豌豆莖高的例子中，純品系的兩種相對性狀交配後，第一子代表現出來的性狀稱為顯性；第一子代沒有表現出來的另一種性狀稱為隱性。",
+                "請回到研究室的電腦，比較原本的假設和兩次實驗的實驗結果，決定是否修改最終的假設，再提交報告內容。",
 
-    "隱性沒有表現出來，不代表相關遺傳訊息已經消失。第二子代再次出現矮莖，就是我們需要一起考慮的證據。",
-
-    $"你最初記錄的是：「{researchRecordController.GetHypothesisDescription()}」。請把這個想法和顯隱性的意思、兩代的觀察結果放在一起比較。",
-
-    "如果保留原本的假設，它能解釋這些結果嗎？如果需要修改，你會改成哪一種判斷？",
-
-    "請回到研究室的電腦，檢視原本的假設，選擇保留或修正，再向研究中心提交判斷。"
-},
+                "研究中心收到報告後，會檢查這個判斷是否符合實驗結果，並回覆你。"
+            },
             // 老師說完後，再讓玩家自由移動。
             gameManager.ReturnToExploring
         );
@@ -958,19 +1060,155 @@ public class MissionController : MonoBehaviour
     public bool TrySubmitHypothesisReport(
     ResearchRecordController.HypothesisType judgment)
     {
-        // 確認目前正在檢視假設，並且玩家已選擇一個判斷。
-        if (currentMissionStep != MissionStep.ReviewHypothesis ||
-            researchRecordController == null ||
-            judgment == ResearchRecordController.HypothesisType.None)
+        if (!CanSubmitHypothesisReport())
         {
             return false;
         }
 
-        // 保存本次報告，供研究中心產生回覆。
+        if (judgment !=
+                ResearchRecordController.HypothesisType.TallStemDominant &&
+            judgment !=
+                ResearchRecordController.HypothesisType.ShortStemDominant)
+        {
+            return false;
+        }
+
+        // 原始假設不變，只更新本次提交的判斷。
         researchRecordController.SaveSubmittedHypothesis(judgment);
 
-        // 標記報告已提交，等待玩家關閉電腦。
+        // 初次提交與重新提交，都重新進入等待關閉電腦的階段。
         SetMissionStep(MissionStep.ReportSubmitted);
+
         return true;
+    }
+
+    private IEnumerator WaitForReportReply()
+    {
+        yield return new WaitForSecondsRealtime(reportReplyDelay);
+
+        // 確認仍在等待同一份報告。
+        if (currentMissionStep != MissionStep.WaitingReportReply)
+        {
+            yield break;
+        }
+
+        SetMissionStep(MissionStep.ReportReplyReady);
+
+        gameManager.ShowSystemHint(
+            gameManager.IsNarrativeVersion
+                ? "收到研究中心回覆，請前往電腦查看"
+                : "判斷檢核已完成，請前往電腦查看"
+        );
+    }
+
+    // 初次提交與退回重交，共用相同的開放條件。
+    public bool CanSubmitHypothesisReport()
+    {
+        return researchRecordController != null &&
+               researchRecordController.OffspringQuizCompleted &&
+               (
+                   currentMissionStep == MissionStep.ReviewHypothesis ||
+                   HasRejectedReport
+               );
+    }
+
+    //==============
+    //收尾
+    //==============
+    // 由 GameManager 在確認解說影片觀看條件後呼叫。
+    public void TryBeginStageAEnding()
+    {
+        if (currentMissionStep != MissionStep.ReportReplyReady ||
+            !HasPassedReport)
+        {
+            return;
+        }
+
+        SetMissionStep(MissionStep.ReturnToUpdatedSigns);
+
+        gameManager.ShowSystemHint(
+            gameManager.IsNarrativeVersion
+                ? "研究中心已採用報告，請回溫室查看更新後的牌子"
+                : "實驗資料已更新，請回溫室查看牌子"
+        );
+    }
+
+
+    // 玩家確實查看更新後的牌子，再關閉時呼叫。
+    // 回傳 true 代表已接手結尾，呼叫端不用再恢復探索。
+    public bool TryCompleteStageAFromSign()
+    {
+        if (currentMissionStep != MissionStep.ReturnToUpdatedSigns)
+        {
+            return false;
+        }
+
+        // 敘事版需要對話元件，缺少設定時保留任務，方便修正。
+        if (gameManager.IsNarrativeVersion && dialogueControll == null)
+        {
+            Debug.LogError("A 階段收尾尚未指定 DialogueControll。", this);
+            return false;
+        }
+
+        // 先更新狀態，避免重複觸發。
+        SetMissionStep(MissionStep.StageACompleted);
+
+        if (gameManager.IsNarrativeVersion)
+        {
+            gameManager.EnterMissionDialogue();
+
+            dialogueControll.OpenDialogue(
+                "指導老師",
+                teacherVisual,
+                new string[]
+                {
+                "研究中心已經採用你的判斷，這批豌豆的資料終於能補齊了。",
+
+                "從觀察親代、培育子代，到提出有證據的判斷，你完成了這次的實習任務。",
+
+                "恭喜你，正式完成研究中心的實習！這一區就保留你的培育成果吧。"
+                },
+                OnStageAEndingFinished
+            );
+        }
+        else
+        {
+            OnStageAEndingFinished();
+        }
+
+        return true;
+    }
+
+    // 只補齊 A 的紀錄；不管理 B 任務。
+    public void CompleteStageAForQuickStart()
+    {
+        researchRecordController.SaveSubmittedHypothesis(
+            ResearchRecordController.HypothesisType.TallStemDominant);
+        SetMissionStep(MissionStep.StageACompleted);
+    }
+
+    // A 結尾完成後，才處理下一階段是否可以開始。
+    private void OnStageAEndingFinished()
+    {
+        // 先讓 A 正常結束並恢復玩家操作。
+        gameManager.ReturnToExploring();
+        gameManager.ShowSystemHint(
+            gameManager.IsNarrativeVersion
+                ? "實習任務已完成"
+                : "本階段實驗已完成"
+        );
+
+        // 下一階段尚未設定好，不影響 A 的完成狀態。
+        if (!gameManager.CanBeginStageB())
+        {
+            Debug.LogWarning(
+                "A 階段已完成；B 設定尚未完整，暫不進入下一階段。",
+                this
+            );
+
+            return;
+        }
+
+        gameManager.BeginStageB();
     }
 }

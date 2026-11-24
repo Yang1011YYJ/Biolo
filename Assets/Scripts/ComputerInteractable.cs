@@ -9,47 +9,57 @@ public class ComputerInteractable : MonoBehaviour
     {
         Story,
         Mission,
-        Report
+        Report,
+        Book
     }
 
     [Header("電腦分頁")]
-    [Tooltip("故事頁面，依閱讀順序指定。")]public GameObject[] storyPages;
-    [Tooltip("任務頁面，依閱讀順序指定。")]public GameObject[] missionPages;
-    [Tooltip("報告頁面，依閱讀順序指定。")]public GameObject[] reportPages;
-    [Tooltip("所有側欄共用的上一頁按鈕。")]public Button previousPageButton;
-    [Tooltip("所有側欄共用的下一頁按鈕。")]public Button nextPageButton;
-    [Tooltip("所有側欄共用的頁碼文字。")]public TMP_Text pageNumberText;
-    [Tooltip("影片控制器，只負責播放與觀看紀錄。")]public StoryVideoController storyVideoController;
-    [Tooltip("故事分類中，影片頁的索引。第一頁填 0。")][Min(0)]public int storyVideoPageIndex = 0;
-    [Tooltip("目前選取的側欄分類，由程式更新。")][SerializeField]private ComputerSection currentSection = ComputerSection.Mission;
-    [Tooltip("目前分類的頁面索引，從 0 開始，由程式更新。")][SerializeField]private int currentPageIndex;
+    [Tooltip("故事頁面，依閱讀順序指定。")] public GameObject[] storyPages;
+    [Tooltip("任務頁面，依閱讀順序指定。")] public GameObject[] missionPages;
+    [Tooltip("報告頁面，依閱讀順序指定。")] public GameObject[] reportPages;
+    [Tooltip("遺傳手冊頁面，依閱讀順序指定。")] public GameObject[] BookPages;
+    [Tooltip("所有側欄共用的上一頁按鈕。")] public Button previousPageButton;
+    [Tooltip("所有側欄共用的下一頁按鈕。")] public Button nextPageButton;
+    [Tooltip("所有側欄共用的頁碼文字。")] public TMP_Text pageNumberText;
+    [Tooltip("影片控制器，只負責播放與觀看紀錄。")] public StoryVideoController storyVideoController;
+    [Tooltip("故事分類中，影片頁的索引。第一頁填 0。")][Min(0)] public int storyVideoPageIndex = 0;
+    [Tooltip("目前選取的側欄分類，由程式更新。")][SerializeField] private ComputerSection currentSection = ComputerSection.Mission;
+    [Tooltip("目前分類的頁面索引，從 0 開始，由程式更新。")][SerializeField] private int currentPageIndex;
 
     [Header("互動設定")]
     public float interactionDistance = 2.5f; // 可以操作電腦的最大距離。
 
     [Header("中央內容區")]
-    [Tooltip("實習任務按鈕所對應的內容")]public GameObject missionContent; // 顯示實習任務的區域。
-    [Tooltip("故事按鈕所對應的內容")]public GameObject storyContent; // 顯示故事的區域。
-    [Tooltip("實驗報告按鈕所對應的內容")]public GameObject reportContent; // 顯示實驗報告的區域。
+    [Tooltip("實習任務按鈕所對應的內容")] public GameObject missionContent; // 顯示實習任務的區域。
+    [Tooltip("故事按鈕所對應的內容")] public GameObject storyContent; // 顯示故事的區域。
+    [Tooltip("實驗報告按鈕所對應的內容")] public GameObject reportContent; // 顯示實驗報告的區域。
+    [Tooltip("遺傳手冊按鈕所對應的內容")] public GameObject BookContent; // 顯示遺傳手冊的區域。
 
     [Header("任務分頁")]
-    [Tooltip("任務第二頁的研究問題與方法文字。")]public TMP_Text researchInfoText;
-    [Tooltip("任務控制器，用來讀取目前任務階段。")]public MissionController missionController;
+    [Tooltip("任務第二頁的研究問題與方法文字。")] public TMP_Text researchInfoText;
+    [Tooltip("任務控制器，用來讀取目前任務階段。")] public MissionController missionController;
+
+    [Header("報告第三頁影片")]
+    [Tooltip("實驗解說影片在報告分類中的頁面索引。第三頁填 2。")][Min(0)] public int reportVideoPageIndex = 2;
 
     [Header("教材內容")]
-    [Tooltip("整體流程控制器，用來讀取目前使用的教材版本。")]public GameManager gameManager;
     [Tooltip("電腦任務頁的標題文字，不是任務接受狀態文字。")] public TMP_Text missionTitleText;
-    [Tooltip("電腦任務頁的委託或實驗說明文字。")]public TMP_Text missionDescriptionText;
+    [Tooltip("電腦任務頁的委託或實驗說明文字。")] public TMP_Text missionDescriptionText;
 
     [Header("研究背景頁")]
-    [Tooltip("研究背景頁的標題文字，須放在 storyContent 底下。")]public TMP_Text storyTitleText;
-    [Tooltip("研究背景頁的內文，建議放在 Scroll View 的 Content 底下。")]public TMP_Text storyDescriptionText;
+    [Tooltip("研究背景頁的標題文字，須放在 storyContent 底下。")] public TMP_Text storyTitleText;
+    [Tooltip("研究背景頁的內文，建議放在 Scroll View 的 Content 底下。")] public TMP_Text storyDescriptionText;
 
+    [Header("遺傳手冊頁面")]
+    [Tooltip("標題")] public TMP_Text BookTitle;
+    [Tooltip("Scroll View 內的 TMP 文字")] public TMP_Text ScrollView_TMP;
+    [Tooltip("查閱完成按鈕")] public Button FinishButton;
 
 
     [Header("腳本")]
     public ExperimentReportController experimentReportController;
-    // 控制實驗報告內容。
+    [Tooltip("報告實驗解說影片專用的控制器，與故事影片分開指定。")] public StoryVideoController reportVideoController;
+    [Tooltip("整體流程控制器，用來讀取目前使用的教材版本。")] public GameManager gameManager;
 
 
     // ==========================================
@@ -92,6 +102,19 @@ public class ComputerInteractable : MonoBehaviour
 
     public void ShowMissionContent()
     {
+        if (gameManager != null && gameManager.IsStageB)
+        {
+            StageBMissionController stageB = gameManager.stageBMissionController;
+            stageB.GetMissionContent(out string title, out string description,
+                out string researchInfo);
+            if (missionTitleText != null) missionTitleText.text = title;
+            if (missionDescriptionText != null) missionDescriptionText.text = description;
+            if (researchInfoText != null) researchInfoText.text = researchInfo;
+            OpenSection(ComputerSection.Mission);
+            RefreshMissionAcceptanceUI();
+            return;
+        }
+
         RefreshMissionContent();
 
         if (missionController != null && researchInfoText != null)
@@ -100,6 +123,7 @@ public class ComputerInteractable : MonoBehaviour
         }
 
         OpenSection(ComputerSection.Mission);
+        RefreshMissionAcceptanceUI();
     }
 
 
@@ -111,6 +135,27 @@ public class ComputerInteractable : MonoBehaviour
     public void ShowStoryContent()
     {
         OpenSection(ComputerSection.Story);
+    }
+
+    // ==========================================
+    // 開啟遺傳手冊頁面
+    // ==========================================
+    public void ShowBookContent()
+    {
+        if (gameManager == null)
+        {
+            return;
+        }
+
+        if (!gameManager.IsStageB ||
+            gameManager.stageBMissionController == null ||
+            !gameManager.stageBMissionController.MissionAccepted)
+        {
+            gameManager.ShowSystemHint("請先接受本次遺傳預測任務");
+            return;
+        }
+
+        OpenSection(ComputerSection.Book);
     }
 
     // ==========================================
@@ -134,30 +179,51 @@ public class ComputerInteractable : MonoBehaviour
 
     private void OpenSection(ComputerSection section)
     {
-        // 先暫停影片，保留播放位置。
+        // 切換分類時暫停影片，保留進度。
         if (storyVideoController != null)
-        {
             storyVideoController.SetPageVisible(false);
-        }
+
+        if (reportVideoController != null)
+            reportVideoController.SetPageVisible(false);
+
+        HideAllContent();
 
         currentSection = section;
         currentPageIndex = 0;
 
-        if (storyContent != null)
+        GameObject targetContent = null;
+
+        switch (section)
         {
-            storyContent.SetActive(section == ComputerSection.Story);
+            case ComputerSection.Story:
+                targetContent = storyContent;
+                break;
+
+            case ComputerSection.Mission:
+                targetContent = missionContent;
+                break;
+
+            case ComputerSection.Report:
+                targetContent = reportContent;
+                break;
+
+            case ComputerSection.Book:
+                targetContent = BookContent;
+                break;
         }
 
-        if (missionContent != null)
+        if (targetContent == null)
         {
-            missionContent.SetActive(section == ComputerSection.Mission);
+            Debug.LogError(
+                $"電腦分類「{section}」尚未指定內容根物件。",
+                this
+            );
+
+            RefreshNavigation();
+            return;
         }
 
-        if (reportContent != null)
-        {
-            reportContent.SetActive(section == ComputerSection.Report);
-        }
-
+        targetContent.SetActive(true);
         ApplyCurrentPage();
     }
 
@@ -177,6 +243,9 @@ public class ComputerInteractable : MonoBehaviour
 
             case ComputerSection.Report:
                 return reportPages;
+
+            case ComputerSection.Book:
+                return BookPages;
 
             default:
                 return null;
@@ -260,6 +329,28 @@ public class ComputerInteractable : MonoBehaviour
             storyVideoController.SetPageVisible(videoVisible);
         }
 
+
+        if (currentSection == ComputerSection.Mission &&
+            gameManager != null && gameManager.IsStageB &&
+            pages[currentPageIndex] != null && pages[currentPageIndex].activeInHierarchy)
+        {
+            gameManager.stageBMissionController.NotifyMissionPageViewed(currentPageIndex);
+        }
+
+        // 確認手冊最後一頁真的顯示在畫面上。
+        if (currentSection == ComputerSection.Book &&
+            gameManager != null &&
+            gameManager.IsStageB &&
+            gameManager.stageBMissionController != null &&
+            currentPageIndex == pages.Length - 1 &&
+            pages[currentPageIndex] != null &&
+            pages[currentPageIndex].activeInHierarchy)
+        {
+            gameManager.stageBMissionController.NotifyManualPageViewed();
+        }
+
+        RefreshMissionAcceptanceUI();
+        RefreshReportVideoVisibility();
         RefreshNavigation();
     }
 
@@ -270,15 +361,23 @@ public class ComputerInteractable : MonoBehaviour
 
     private bool IsNextPageLocked()
     {
-        if (currentSection != ComputerSection.Story ||
-            currentPageIndex != storyVideoPageIndex)
+        // 故事影片：沿用首次完整觀看限制。
+        if (currentSection == ComputerSection.Story &&
+            currentPageIndex == storyVideoPageIndex)
         {
-            return false;
+            return storyVideoController == null ||
+                   !storyVideoController.HasCompletedFirstViewing;
         }
 
-        // 缺少影片控制器時，也不放行首次觀看限制。
-        return storyVideoController == null ||
-               !storyVideoController.HasCompletedFirstViewing;
+        // 報告第二頁往第三頁：必須先收到通過回覆。
+        if (currentSection == ComputerSection.Report &&
+            currentPageIndex == reportVideoPageIndex - 1)
+        {
+            return missionController == null ||
+                   !missionController.HasPassedReport;
+        }
+
+        return false;
     }
 
 
@@ -311,6 +410,7 @@ public class ComputerInteractable : MonoBehaviour
                 ? $"{currentPageIndex + 1} / {count}"
                 : "0 / 0";
         }
+        RefreshBookUI();
     }
 
 
@@ -476,6 +576,30 @@ public class ComputerInteractable : MonoBehaviour
 
                 break;
 
+            case MissionController.MissionStep.ReviewOffspringData:
+
+                researchInfoText.text = gameManager.IsNarrativeVersion
+                    ? "【目前的調查進度】\n" +
+                      "你已完成第一、第二子代的培育與單株觀察。" +
+                      "接下來需要比較多株資料，回答矮莖是否再次出現。\n\n" +
+
+                      "【待整理的證據】\n" +
+                      "比較兩代出現的性狀，以及高莖、矮莖的株數關係。\n\n" +
+
+                      "【接續工作】\n" +
+                      "從背包開啟實驗紀錄板，完成兩道資料判讀題。"
+
+                    : "【資料比較】\n" +
+                      "完成單株觀察後，使用多株培育資料比較第一、第二子代。\n\n" +
+
+                      "【判讀項目】\n" +
+                      "比較兩代出現的性狀，以及高莖、矮莖的株數關係。\n\n" +
+
+                      "【完成條件】\n" +
+                      "從背包開啟實驗紀錄板，完成兩道資料判讀題。";
+
+                break;
+
             default:
                 // 後續階段的內容隨教材製作補上。
                 researchInfoText.text =
@@ -484,5 +608,101 @@ public class ComputerInteractable : MonoBehaviour
 
                 break;
         }
+    }
+
+    private void RefreshReportVideoVisibility()
+    {
+        if (reportVideoController == null)
+        {
+            return;
+        }
+
+        GameObject[] pages = GetCurrentPages();
+
+        bool visible =
+            currentSection == ComputerSection.Report &&
+            currentPageIndex == reportVideoPageIndex &&
+            missionController != null &&
+            missionController.HasPassedReport &&
+            pages != null &&
+            currentPageIndex >= 0 &&
+            currentPageIndex < pages.Length &&
+            pages[currentPageIndex] != null &&
+            pages[currentPageIndex].activeInHierarchy;
+
+        reportVideoController.SetPageVisible(visible);
+    }
+
+    [Header("共用任務接受介面")]
+    [Tooltip("任務第二頁既有的接受按鈕，A/B 共用。On Click 改接 AcceptCurrentMission。")]
+    public Button missionAcceptButton;
+    [Tooltip("任務第二頁既有的接受狀態文字，A/B 共用。")]
+    public TMP_Text missionAcceptanceText;
+
+    public void AcceptCurrentMission()
+    {
+        if (currentSection != ComputerSection.Mission || currentPageIndex != 1)
+            return;
+        if (gameManager != null && gameManager.IsStageB)
+            gameManager.stageBMissionController.AcceptMission();
+        else if (missionController != null)
+            missionController.AcceptMission();
+        RefreshMissionAcceptanceUI();
+    }
+
+    private void RefreshMissionAcceptanceUI()
+    {
+        bool isB = gameManager != null && gameManager.IsStageB;
+        bool accepted = isB
+            ? gameManager.stageBMissionController.MissionAccepted
+            : missionController != null && missionController.missionAccepted;
+        bool canAccept = isB
+            ? gameManager.stageBMissionController.CanAcceptMission
+            : missionController != null && !accepted;
+
+        if (missionAcceptButton != null)
+            missionAcceptButton.interactable = canAccept &&
+                currentSection == ComputerSection.Mission && currentPageIndex == 1;
+        if (missionAcceptanceText != null)
+        {
+            missionAcceptanceText.text = accepted ? "已接受" : "未接受";
+            missionAcceptanceText.color = accepted
+                ? new Color(0f, 0.84f, 0f, 1f) : Color.gray;
+        }
+    }
+
+    private void RefreshBookUI()
+    {
+        if (FinishButton == null)
+        {
+            return;
+        }
+
+        int pageCount = BookPages != null ? BookPages.Length : 0;
+
+        FinishButton.interactable =
+            gameManager != null &&
+            gameManager.IsStageB &&
+            gameManager.stageBMissionController != null &&
+            gameManager.currentState == GameManager.GameState.Computer &&
+            currentSection == ComputerSection.Book &&
+            pageCount > 0 &&
+            currentPageIndex == pageCount - 1 &&
+            gameManager.stageBMissionController.CanCompleteManualReading;
+    }
+
+    private void HideAllContent()
+    {
+        if (storyContent != null)
+            storyContent.SetActive(false);
+
+        if (missionContent != null)
+            missionContent.SetActive(false);
+
+        if (reportContent != null)
+            reportContent.SetActive(false);
+
+        if (BookContent != null)
+            BookContent.SetActive(false);
     }
 }

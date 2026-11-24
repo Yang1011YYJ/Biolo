@@ -21,6 +21,25 @@ public class GreenhouseController : MonoBehaviour
     // 豌豆牌子
     // ==========================================
 
+    [System.Serializable]
+    public class SignPage
+    {
+        [Tooltip("這份資料對應的場景牌子。Collider 可以放在它的子物件。")]
+        public GameObject signObject;
+
+        [Tooltip("牌子面板的標題。")]
+        public string title;
+
+        [Tooltip("牌子面板的內文。")]
+        [TextArea(4, 12)]
+        public string content;
+    }
+
+    [Header("共用牌子資料")]
+
+    [Tooltip("集中設定各塊牌子的標題與內文，A、B 都可使用。")]
+    public SignPage[] signPages;
+
     [Header("豌豆牌子")]
 
     [Tooltip("高莖親代旁邊的牌子")]
@@ -35,7 +54,11 @@ public class GreenhouseController : MonoBehaviour
     // 目前查看的子代牌子。
     // 查看原本甲、乙牌子時為 null。
     private PeaInfoSign currentOffspringSign;
+    [Tooltip("目前開啟的牌子是否顯示了更新後的研究結論，由程式設定。")][SerializeField]private bool currentSignShowsResearchResult;
 
+    // 共用資料牌關閉後的通知。
+    // 回傳 true 代表對話等其他流程已接手玩家操作。
+    private System.Func<bool> referenceSignClosed;
 
     // ==========================================
     // 牌子互動設定
@@ -100,86 +123,81 @@ public class GreenhouseController : MonoBehaviour
     // ==========================================
 
     public bool TryOpenSign(
-        GameObject clickedObject,
-        Transform player)
+    GameObject clickedObject,
+    Transform player)
     {
-        InteractionDebug.LogDistance(
-            "查看牌子",
-            player,
-            clickedObject.transform,
-            interactionDistance
-        );
-
-        // 計算玩家和被點擊物件之間的距離。
-        float distance = Vector3.Distance(
-            player.position,
-            clickedObject.transform.position
-        );
-
-
-        // 如果距離超過允許互動的範圍。
-        if (distance > interactionDistance)
+        if (player == null ||
+            gameManager == null ||
+            !TryResolveSign(clickedObject, out GameObject signObject))
         {
-            // 顯示測試訊息。
-            Debug.Log("距離牌子太遠。");
-
-            gameManager.ShowSystemHint("距離牌子太遠，請再靠近一點");
-
-            // 表示這次沒有成功開啟牌子。
             return false;
         }
 
-
-        // ======================================
-        // 高莖親代
-        // ======================================
-
-        if (clickedObject == tallPeaSign)
+        if (signPanel == null ||
+            signTitleText == null ||
+            signContentText == null)
         {
-            // 紀錄高莖親代已經被查看。
+            Debug.LogError("共用牌子介面尚未設定完整。", this);
+            return false;
+        }
+
+        InteractionDebug.LogDistance(
+            "查看牌子",
+            player,
+            signObject.transform,
+            interactionDistance
+        );
+
+        // 沿用 A 原本的三維距離判斷。
+        float distance = Vector3.Distance(
+            player.position,
+            signObject.transform.position
+        );
+
+        if (distance > interactionDistance)
+        {
+            gameManager.ShowSystemHint("距離牌子太遠，請再靠近一點");
+            return false;
+        }
+
+        // A 原本的兩塊牌子：保留原觀察流程。
+        if (signObject == tallPeaSign)
+        {
+            referenceSignClosed = null;
             tallPeaViewed = true;
 
-
-            // 通知 MissionController：
-            // 玩家已經開始觀察親代。
             missionController.OnParentSignViewed();
-
-
-            // 顯示高莖親代資料。
             ShowTallPeaSign();
 
-
-            // 表示成功開啟牌子。
             return true;
         }
 
-
-        // ======================================
-        // 矮莖親代
-        // ======================================
-
-        if (clickedObject == shortPeaSign)
+        if (signObject == shortPeaSign)
         {
-            // 紀錄矮莖親代已經被查看。
+            referenceSignClosed = null;
             shortPeaViewed = true;
 
-
-            // 通知 MissionController：
-            // 玩家已經開始觀察親代。
             missionController.OnParentSignViewed();
-
-
-            // 顯示矮莖親代資料。
             ShowShortPeaSign();
 
-
-            // 表示成功開啟牌子。
             return true;
         }
 
+        // 其餘登記的牌子：共用顯示機制，
+        // 開放條件與關閉後行為交給流程控制器。
+        SignPage page = FindSignPage(signObject);
 
-        // 點到的不是目前可以查看的牌子。
-        return false;
+        if (page == null ||
+            !gameManager.CanOpenReferenceSign(signObject))
+        {
+            return false;
+        }
+
+        return OpenReferenceSign(
+            page.title,
+            page.content,
+            () => gameManager.OnReferenceSignClosed(signObject)
+        );
     }
 
 
@@ -200,6 +218,8 @@ public class GreenhouseController : MonoBehaviour
             "品系：純品系\n" +
             "性狀：高莖";
 
+        ApplyConfiguredContent(tallPeaSign);
+        AppendResearchResult();
 
         // 顯示牌子 Panel。
         signPanel.SetActive(true);
@@ -223,6 +243,8 @@ public class GreenhouseController : MonoBehaviour
             "品系：純品系\n" +
             "性狀：矮莖";
 
+        ApplyConfiguredContent(shortPeaSign);
+        AppendResearchResult();
 
         // 顯示牌子 Panel。
         signPanel.SetActive(true);
@@ -235,7 +257,39 @@ public class GreenhouseController : MonoBehaviour
 
     public void CloseSign()
     {
+        // 避免關閉事件被重複呼叫。
+        if (!signPanel.activeSelf)
+        {
+            return;
+        }
+
         signPanel.SetActive(false);
+
+        // 優先結束共用資料牌，不進入 A 的觀察判斷。
+        if (referenceSignClosed != null)
+        {
+            System.Func<bool> callback = referenceSignClosed;
+            referenceSignClosed = null;
+
+            bool flowTakenOver = callback.Invoke();
+
+            if (!flowTakenOver)
+            {
+                gameManager.ReturnToExploring();
+            }
+
+            return;
+        }
+
+        bool viewedUpdatedResult = currentSignShowsResearchResult;
+        currentSignShowsResearchResult = false;
+
+        if (viewedUpdatedResult &&
+            missionController.TryCompleteStageAFromSign())
+        {
+            currentOffspringSign = null;
+            return;
+        }
 
         // ======================================
         // 剛剛查看的是子代牌子
@@ -319,8 +373,118 @@ public class GreenhouseController : MonoBehaviour
             $"親代來源：{sign.seed.firstParentName} × " +
             $"{sign.seed.secondParentName}";
 
+        AppendResearchResult();
+
         signPanel.SetActive(true);
 
         return true;
+    }
+
+    private void AppendResearchResult()
+    {
+        currentSignShowsResearchResult =
+            missionController != null &&
+            missionController.AreSignResultsUnlocked;
+
+        if (!currentSignShowsResearchResult)
+        {
+            return;
+        }
+
+        signContentText.text +=
+            "\n\n【本次研究結論】\n" +
+            "高莖為顯性，矮莖為隱性。";
+    }
+
+    public bool OpenReferenceSign(
+    string title,
+    string content,
+    System.Func<bool> closedCallback)
+    {
+        if (signPanel == null ||
+            signTitleText == null ||
+            signContentText == null)
+        {
+            Debug.LogError("共用牌子介面尚未設定完整。", this);
+            return false;
+        }
+
+        // 本次不是 A 的親代或子代觀察。
+        currentOffspringSign = null;
+        currentSignShowsResearchResult = false;
+
+        referenceSignClosed = closedCallback;
+
+        signTitleText.text = title;
+        signContentText.text = content;
+
+        signPanel.SetActive(true);
+        return true;
+    }
+
+    private SignPage FindSignPage(GameObject signObject)
+    {
+        if (signObject == null || signPages == null)
+        {
+            return null;
+        }
+
+        foreach (SignPage page in signPages)
+        {
+            if (page != null && page.signObject == signObject)
+            {
+                return page;
+            }
+        }
+
+        return null;
+    }
+
+
+    // 將 Collider 所在的子物件，轉成真正登記的牌子物件。
+    public bool TryResolveSign(
+        GameObject clickedObject,
+        out GameObject signObject)
+    {
+        signObject = null;
+
+        if (clickedObject == null)
+        {
+            return false;
+        }
+
+        Transform current = clickedObject.transform;
+
+        while (current != null)
+        {
+            GameObject candidate = current.gameObject;
+
+            if (candidate == tallPeaSign ||
+                candidate == shortPeaSign ||
+                FindSignPage(candidate) != null)
+            {
+                signObject = candidate;
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+
+    // A 原有牌子也能改用 Inspector 裡的內容。
+    private void ApplyConfiguredContent(GameObject signObject)
+    {
+        SignPage page = FindSignPage(signObject);
+
+        if (page == null)
+        {
+            return;
+        }
+
+        signTitleText.text = page.title;
+        signContentText.text = page.content;
     }
 }

@@ -37,17 +37,21 @@ public class GameManager : MonoBehaviour
     }
 
     [Header("教材版本")]
-    [Tooltip("本次使用的教材版本。目前先完成 Narrative 敘事版；Expository 說明版會在後續接入完整流程。")][SerializeField]private TeachingVersion teachingVersion = TeachingVersion.Narrative;
+    [Tooltip("本次使用的教材版本。目前先完成 Narrative 敘事版；Expository 說明版會在後續接入完整流程。")][SerializeField] private TeachingVersion teachingVersion = TeachingVersion.Narrative;
     // 提供其他腳本查詢目前版本。
-    public bool IsNarrativeVersion =>teachingVersion == TeachingVersion.Narrative;
-    [Tooltip("測試用的教材版本切換按鈕。遊戲開始後不可切換版本。")]public Button teachingVersionButton;
-    [Tooltip("版本切換按鈕上的 TMP 文字，顯示目前選定的版本。")]public TMP_Text teachingVersionButtonText;
+    public bool IsNarrativeVersion => teachingVersion == TeachingVersion.Narrative;
+    [Tooltip("測試用的教材版本切換按鈕。遊戲開始後不可切換版本。")] public Button teachingVersionButton;
+    [Tooltip("版本切換按鈕上的 TMP 文字，顯示目前選定的版本。")] public TMP_Text teachingVersionButtonText;
 
     [Header("開發測試")]
-    [Tooltip("由開始介面的按鈕設定。啟用後略過首次強制觀看、閱讀與接受任務的關閉限制；不會自動完成任務。")][SerializeField]private bool isTestMode = false;
+    [Tooltip("由開始介面的按鈕設定。啟用後略過首次強制觀看、閱讀與接受任務的關閉限制；不會自動完成任務。")][SerializeField] private bool isTestMode = false;
     // 其他程式統一從這裡查詢是否為測試模式。
     public bool IsTestMode => isTestMode;
-    [Tooltip("開始介面上測試開關按鈕的 TMP 文字，顯示「測試：開／關」。")]public TMP_Text testModeButtonText;
+    [Tooltip("開始介面上測試開關按鈕的 TMP 文字，顯示「測試：開／關」。")] public TMP_Text testModeButtonText;
+
+    [Header("提交報告快通")]
+    [Tooltip("直接提交報告時，第一子代要種下的空種植區。不要指定親代甲、乙所在的區域。")] public PlantingSpot quickStartF1Spot;
+    [Tooltip("直接提交報告時，第二子代要種下的空種植區。必須與第一子代使用不同區域。")] public PlantingSpot quickStartF2Spot;
 
     [Header("目前狀態")]
     public GameState currentState; // 紀錄現在處於哪一個流程狀態。
@@ -69,11 +73,11 @@ public class GameManager : MonoBehaviour
     [Tooltip("背包介面UI")] public GameObject BackpackPanel;
 
     [Header("場景中的設備")]
-    [Tooltip("場景中的電腦設備")]public GameObject computerObject;
+    [Tooltip("場景中的電腦設備")] public GameObject computerObject;
 
     [Header("交配演出")]
-    [Tooltip("抵達每株親代後停留的秒數。")][Min(0f)]public float parentVisitWait = 1f;
-    [Tooltip("每一段系統移動允許的最長秒數。超時會中止並恢復操作。")][Min(1f)]public float systemMoveTimeout = 30f;
+    [Tooltip("抵達每株親代後停留的秒數。")][Min(0f)] public float parentVisitWait = 1f;
+    [Tooltip("每一段系統移動允許的最長秒數。超時會中止並恢復操作。")][Min(1f)] public float systemMoveTimeout = 30f;
     // 防止交配演出重複開始。
     private bool isBreedingSequenceRunning;
     // 記錄單段系統移動是否成功抵達。
@@ -85,43 +89,43 @@ public class GameManager : MonoBehaviour
     //public int firstGenerationSeedCount = 0;
 
     [Header("種子與播種")]
-    [Tooltip("目前持有的種子。每次交配新增一筆，播種時移除選中的那筆。")]public List<SeedData> ownedSeeds = new List<SeedData>();
-    [Tooltip("顯示種子清單與確認播種按鈕的面板控制器。")]public SeedSelectionPanel seedSelectionPanel;
-    [Tooltip("目前甲、乙交配所得 F1 的高莖植株 Prefab。")]public GameObject firstGenerationPlantPrefab;
-    [Tooltip("第二次交配產生矮莖子代時使用的植株 Prefab，根物件須掛上 PeaPlant。")]public GameObject shortOffspringPlantPrefab;
+    [Tooltip("目前持有的種子。每次交配新增一筆，播種時移除選中的那筆。")] public List<SeedData> ownedSeeds = new List<SeedData>();
+    [Tooltip("顯示種子清單與確認播種按鈕的面板控制器。")] public SeedSelectionPanel seedSelectionPanel;
+    [Tooltip("目前甲、乙交配所得 F1 的高莖植株 Prefab。")] public GameObject firstGenerationPlantPrefab;
+    [Tooltip("第二次交配產生矮莖子代時使用的植株 Prefab，根物件須掛上 PeaPlant。")] public GameObject shortOffspringPlantPrefab;
     // 保留原本讀取數量的名稱，既有選單呼叫不用全部修改。
     public int firstGenerationSeedCount => ownedSeeds.Count;
-    [Tooltip("下一顆種子的顯示編號。播種消耗種子後不會倒退，避免名稱重複。")][SerializeField, Min(1)]private int nextSeedNumber = 1;
+    [Tooltip("下一顆種子的顯示編號。播種消耗種子後不會倒退，避免名稱重複。")][SerializeField, Min(1)] private int nextSeedNumber = 1;
 
     [Header("可交配植株")]
-    [Tooltip("目前可供選擇的植株。開場指定甲、乙，播種後由程式加入子代。")]public List<PeaPlant> availableParents = new List<PeaPlant>();
-    [Tooltip("開場的矮莖親代乙，用來驗證第二次交配組合。")]public PeaPlant shortOriginalParent;
+    [Tooltip("目前可供選擇的植株。開場指定甲、乙，播種後由程式加入子代。")] public List<PeaPlant> availableParents = new List<PeaPlant>();
+    [Tooltip("開場的矮莖親代乙，用來驗證第二次交配組合。")] public PeaPlant shortOriginalParent;
 
     [Header("植株生成高度")]
-    [Tooltip("高莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]public float tallPlantWorldY= 31.87150001525879f;
-    [Tooltip("矮莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")]public float shortPlantWorldY= 30.60569953918457f;
+    [Tooltip("高莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")] public float tallPlantWorldY = 31.87150001525879f;
+    [Tooltip("矮莖植株生成時使用的世界座標 Y，不受生成定位點的 Y 影響。")] public float shortPlantWorldY = 30.60569953918457f;
 
     [Header("展示與快速測試")]
-    [Tooltip("開始畫面的階段選單：0 正常開始、1 直接交配。未指定時走正常流程。")]public TMP_Dropdown startupStageDropdown;
+    [Tooltip("開始畫面的階段選單：0 正常開始、1 直接交配。未指定時走正常流程。")] public TMP_Dropdown startupStageDropdown;
 
     [Header("腳本")]
     public FadeController fadeController;
     public MissionController missionController; // 控制任務流程。
     public DialogueControll dialogueControll;// 控制共用對話框的顯示與句子推進。
-    [Tooltip("負責顯示播種、交配與關閉按鈕的選單控制器。")]public PlantingActionPanel plantingActionPanel;
+    [Tooltip("負責顯示播種、交配與關閉按鈕的選單控制器。")] public PlantingActionPanel plantingActionPanel;
     // 暫存玩家選定的種植區，後續交配生成子代時使用。
     private PlantingSpot selectedPlantingSpot;
-    [Tooltip("交配時使用的親代選擇面板控制器。")]public ParentSelectionPanel parentSelectionPanel;
+    [Tooltip("交配時使用的親代選擇面板控制器。")] public ParentSelectionPanel parentSelectionPanel;
     // 保存這次確認的兩株親代，後續演出依此順序走位。
     private PeaPlant selectedFirstParent;
     private PeaPlant selectedSecondParent;
-    [Tooltip("畫面下方共用提示框，顯示操作結果、距離不足及獲得道具訊息。")]public SystemHintController systemHintController;
-    [Tooltip("共用的溫室資訊控制器，用來顯示已種下子代的資料。")]public GreenhouseController greenhouseController;
+    [Tooltip("畫面下方共用提示框，顯示操作結果、距離不足及獲得道具訊息。")] public SystemHintController systemHintController;
+    [Tooltip("共用的溫室資訊控制器，用來顯示已種下子代的資料。")] public GreenhouseController greenhouseController;
     [Tooltip("播種成功後生成的資訊牌子 Prefab，需掛有 PeaInfoSign。")]
     public PeaInfoSign offspringSignPrefab;
-    [Tooltip("場景中可拾取的實驗紀錄板。快速開始時會將它加入背包並隱藏。")]public ExperimentClipboardInteractable experimentClipboard;
-    [Tooltip("電腦中的故事頁控制器，用來檢查首次觀看及關閉後重設影片進度。")]public StoryVideoController StoryVideoController;
-
+    [Tooltip("場景中可拾取的實驗紀錄板。快速開始時會將它加入背包並隱藏。")] public ExperimentClipboardInteractable experimentClipboard;
+    [Tooltip("電腦中的故事頁控制器，用來檢查首次觀看及關閉後重設影片進度。")] public StoryVideoController StoryVideoController;
+    [Tooltip("報告第三頁的影片控制器，用來檢查首次觀看與關閉後重設進度。")] public StoryVideoController reportVideoController;
 
     private void Start()
     {
@@ -204,6 +208,17 @@ public class GameManager : MonoBehaviour
             StartFromTestStage();
             return;
         }
+        if (selectedStage == 2)
+        {
+            QuickStartBeforeReport();
+            return;
+        }
+
+        if (selectedStage == 3)
+        {
+            QuickStartStageB();
+            return;
+        }
 
         // 正常開始時隱藏選單。
         if (startupStageDropdown != null)
@@ -250,8 +265,13 @@ public class GameManager : MonoBehaviour
     // 快速開始：交配測試
     // ==========================================
 
-    private void StartFromTestStage()
+    private bool StartFromTestStage(bool prepareReport = false)
     {
+        // 先驗證，設定不完整時不開始補齊進度。
+        if (prepareReport && !ValidateReportQuickStart())
+        {
+            return false;
+        }
 
         // 快速開始必須能補齊影片觀看狀態。
         if (StoryVideoController == null)
@@ -260,7 +280,7 @@ public class GameManager : MonoBehaviour
                 "快速開始失敗：尚未指定 StoryVideoController。"
             );
 
-            return;
+            return false;
         }
         // ======================================
         // 先確認快速開始需要的元件
@@ -276,13 +296,13 @@ public class GameManager : MonoBehaviour
                 "溫室控制器與場景紀錄板。"
             );
 
-            return;
+            return false;
         }
 
         // 確認能取得紀錄板，再開始切換流程。
         if (!experimentClipboard.GrantForQuickStart())
         {
-            return;
+            return false;
         }
 
         // ======================================
@@ -307,8 +327,29 @@ public class GameManager : MonoBehaviour
         greenhouseController.tallPeaViewed = true;
         greenhouseController.shortPeaViewed = true;
 
-        missionController.currentMissionStep =
-            MissionController.MissionStep.ReadyForExperiment;
+        if (prepareReport)
+        {
+            // 新增：實際種出 F1、F2 與資訊牌。
+            if (!GrowOffspringForQuickStart())
+            {
+                return false;
+            }
+
+            // 補齊觀察與兩道判讀題的完成狀態。
+            record.UnlockOffspringData();
+            record.CompleteTraitAnswer();
+            record.CompleteRatioAnswer();
+
+            // 設定為已完成實驗，準備提交報告。
+            missionController.currentMissionStep =
+                MissionController.MissionStep.ReviewHypothesis;
+        }
+        else
+        {
+            // 原本的親代交配快速開始。
+            missionController.currentMissionStep =
+                MissionController.MissionStep.ReadyForExperiment;
+        }
 
         // 同步任務接受介面。
         if (missionController.AcceptMissionState != null)
@@ -357,6 +398,7 @@ public class GameManager : MonoBehaviour
             $"已記錄：{record.IsHypothesisRecorded()}｜" +
             "紀錄板已加入背包｜ReadyForExperiment"
         );
+        return true;
     }
 
     // ==========================================
@@ -468,6 +510,21 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        if (IsStageB)
+        {
+            if (!IsTestMode && !stageBMissionController.MissionAccepted)
+            {
+                ShowSystemHint("請到「任務」第二頁確認本次任務");
+                return;
+            }
+
+            computerPanel.SetActive(false);
+            ResetComputerVideos();
+            stageBMissionController.OnComputerClosed();
+            ReturnToExploring();
+            return;
+        }
+
         // 任務尚未接受時，不能離開電腦。
         if (missionController == null)
         {
@@ -498,11 +555,34 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        // 報告通過後，必須完成第三頁影片才能離開電腦。
+        // 測試模式略過此限制。
+        if (!IsTestMode && missionController.HasPassedReport)
+        {
+            if (reportVideoController == null)
+            {
+                Debug.LogError("尚未指定報告第三頁影片控制器。");
+
+                ShowSystemHint("實驗解說影片尚未設定");
+                return;
+            }
+
+            if (!reportVideoController.HasCompletedFirstViewing)
+            {
+                ShowSystemHint("請到「報告」第 3 頁完整觀看實驗解說");
+                return;
+            }
+        }
+
+        // 前面的程式已檢查首次影片觀看條件。
+        // 通過報告後，這次關閉電腦才開啟溫室收尾。
+        missionController.TryBeginStageAEnding();
+
         // 先隱藏介面，觸發故事頁暫停。
         computerPanel.SetActive(false);
 
         // 再重設位置，避免暫停時將舊位置寫回。
-        StoryVideoController.ResetAfterComputerClosed();
+        ResetComputerVideos();
 
         // 沿用原本的任務流程。
         bool missionDialogueStarted =
@@ -1468,8 +1548,8 @@ public class GameManager : MonoBehaviour
         if (teachingVersionButtonText != null)
         {
             teachingVersionButtonText.text = IsNarrativeVersion
-                ? "目前：敘事版\n"+"點擊切換"
-                : "目前：說明版\n"+"點擊切換";
+                ? "目前：敘事版\n" + "點擊切換"
+                : "目前：說明版\n" + "點擊切換";
         }
 
         if (teachingVersionButton != null)
@@ -1503,5 +1583,285 @@ public class GameManager : MonoBehaviour
             testModeButtonText.text =
                 isTestMode ? "測試：開" : "測試：關";
         }
+    }
+
+    // 開始介面的「直接提交報告」按鈕使用。
+    public void QuickStartBeforeReport()
+    {
+        if (currentState != GameState.PreStart)
+        {
+            return;
+        }
+
+        StartFromTestStage(true);
+    }
+
+    // ==========================================
+    // 快通：準備 F1、F2 的種子並完成播種
+    // ==========================================
+
+    private bool GrowOffspringForQuickStart()
+    {
+        // 建立親代甲 × 親代乙產生的 F1 種子。
+        SeedData f1Seed = new SeedData
+        {
+            seedId = System.Guid.NewGuid().ToString("N"),
+            displayName = "豌豆種子",
+            firstParentName = "親代甲",
+            secondParentName = "親代乙",
+            generation = 1,
+            crossType = SeedData.CrossType.OriginalParents,
+            isTall = true
+        };
+
+        // 將 F1 種在 Inspector 指定的第一個種植區。
+        if (!PlantSeedForQuickStart(quickStartF1Spot, f1Seed))
+        {
+            return false;
+        }
+
+        // 取得剛剛實際長出來的 F1。
+        PeaPlant f1Plant =
+            quickStartF1Spot.plantedPlant.GetComponent<PeaPlant>();
+
+        // 建立這株 F1 自交產生的 F2 種子。
+        SeedData f2Seed = new SeedData
+        {
+            seedId = System.Guid.NewGuid().ToString("N"),
+            displayName = "豌豆種子",
+            firstParentName = f1Plant.displayName,
+            secondParentName = f1Plant.displayName,
+            generation = 2,
+            crossType = SeedData.CrossType.F1SelfCross,
+            isTall = UnityEngine.Random.value < 0.75f
+        };
+
+        // 將 F2 種在 Inspector 指定的第二個種植區。
+        return PlantSeedForQuickStart(quickStartF2Spot, f2Seed);
+    }
+
+
+    // ==========================================
+    // 快通：呼叫原本的播種功能
+    // ==========================================
+
+    private bool PlantSeedForQuickStart(
+        PlantingSpot spot,
+        SeedData seed)
+    {
+        GameState previousState = currentState;
+
+        // 原本的播種函式需要知道種在哪裡，
+        // 而且玩家必須持有這顆種子。
+        selectedPlantingSpot = spot;
+        ownedSeeds.Add(seed);
+
+        // 切換成播種函式允許的狀態，
+        // 再呼叫你原本已經能正常使用的播種功能。
+        SetState(GameState.SeedSelection);
+        OnSeedConfirmed(seed);
+
+        // 確認植物與牌子確實生成成功。
+        bool planted =
+            spot.isOccupied &&
+            spot.plantedSeed == seed &&
+            spot.plantedPlant != null &&
+            spot.plantedSign != null;
+
+        if (!planted)
+        {
+            ownedSeeds.Remove(seed);
+
+            Debug.LogError(
+                $"提交報告快通：種植區「{spot.name}」播種失敗。",
+                spot
+            );
+        }
+
+        selectedPlantingSpot = null;
+        SetState(previousState);
+
+        return planted;
+    }
+
+    private bool ValidateReportQuickStart()
+    {
+        if (quickStartF1Spot == null ||
+            quickStartF2Spot == null ||
+            quickStartF1Spot == quickStartF2Spot)
+        {
+            Debug.LogError(
+                "提交報告快通：請指定兩個不同的空種植區。",
+                this
+            );
+            return false;
+        }
+
+        if (firstGenerationPlantPrefab == null ||
+            shortOffspringPlantPrefab == null ||
+            offspringSignPrefab == null)
+        {
+            Debug.LogError(
+                "提交報告快通：尚未指定高莖、矮莖或資訊牌 Prefab。",
+                this
+            );
+            return false;
+        }
+
+        if (firstGenerationPlantPrefab.GetComponent<PeaPlant>() == null ||
+            shortOffspringPlantPrefab.GetComponent<PeaPlant>() == null)
+        {
+            Debug.LogError(
+                "提交報告快通：高莖與矮莖 Prefab 根物件都需要 PeaPlant。",
+                this
+            );
+            return false;
+        }
+
+        return ValidateQuickStartSpot(quickStartF1Spot) &&
+               ValidateQuickStartSpot(quickStartF2Spot);
+    }
+
+    private bool ValidateQuickStartSpot(PlantingSpot spot)
+    {
+        if (!spot.CanUse() ||
+            spot.plantedPlant != null ||
+            spot.plantedSign != null)
+        {
+            Debug.LogError(
+                $"提交報告快通：種植區「{spot.name}」不是空的。",
+                spot
+            );
+            return false;
+        }
+
+        if (spot.signSpawnPoint == null ||
+            spot.transform.Find("Interaction Point") == null)
+        {
+            Debug.LogError(
+                $"提交報告快通：種植區「{spot.name}」缺少牌子生成點或 Interaction Point。",
+                spot
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    public enum TeachingStage { A, B }
+
+    [Header("教材階段")]
+    [Tooltip("目前教材階段，由正式轉場或快通更新。")]
+    [SerializeField] private TeachingStage currentTeachingStage = TeachingStage.A;
+    [Tooltip("B 任務專用控制器。")]
+    public StageBMissionController stageBMissionController;
+    private bool isStageTransitionRunning;
+    public bool IsStageB => currentTeachingStage == TeachingStage.B;
+
+    public bool CanBeginStageB()
+    {
+        return stageBMissionController != null &&
+            stageBMissionController.IsConfigured && fadeController != null &&
+            BlackPanel != null && missionController != null &&
+            stageBMissionController.CurrentStep ==
+                StageBMissionController.MissionStep.NotStarted;
+    }
+
+    public void BeginStageB()
+    {
+        if (IsStageB || isStageTransitionRunning) return;
+        if (!CanBeginStageB() || missionController.currentMissionStep !=
+            MissionController.MissionStep.StageACompleted)
+        {
+            Debug.LogError("無法進入 B：請確認 A 已完成及 B 控制器、黑幕設定。", this);
+            return;
+        }
+
+        isStageTransitionRunning = true;
+        EnterMissionDialogue();
+        BlackPanel.SetActive(true);
+        fadeController.Fade(BlackPanel, 0, 1, FadeIn, () =>
+        {
+            // 保留 A 的植物、牌子、研究資料，不重新載入場景。
+            currentTeachingStage = TeachingStage.B;
+            fadeController.Wait(0.5f, () =>
+            {
+                fadeController.Fade(BlackPanel, 1, 0, FadeOut, () =>
+                {
+                    BlackPanel.SetActive(false);
+                    isStageTransitionRunning = false;
+                    stageBMissionController.BeginStage();
+                });
+            });
+        });
+    }
+
+    public void QuickStartStageB()
+    {
+        if (currentState != GameState.PreStart) return;
+        if (!CanBeginStageB() || reportVideoController == null)
+        {
+            Debug.LogError("B 快通設定不完整：請確認 B 控制器、影片與黑幕。", this);
+            return;
+        }
+
+        // 沿用 A 快通：取得紀錄板、生成 F1/F2、完成觀察與兩題。
+        if (!StartFromTestStage(true)) return;
+
+        missionController.CompleteStageAForQuickStart();
+        reportVideoController.CompleteViewingForQuickStart();
+        BeginStageB();
+    }
+
+    private void ResetComputerVideos()
+    {
+        if (StoryVideoController != null)
+            StoryVideoController.ResetAfterComputerClosed();
+        if (reportVideoController != null)
+            reportVideoController.ResetAfterComputerClosed();
+    }
+
+    // 共用資料牌關閉後，通知目前的任務。
+    // true：對話已接手操作；false：由牌子系統恢復探索。
+    public bool OnReferenceSignClosed(GameObject signObject)
+    {
+        if (IsStageB &&
+            stageBMissionController != null &&
+            stageBMissionController.IsCurrentParentSign(signObject))
+        {
+            return stageBMissionController.OnParentSignClosed(signObject);
+        }
+
+        return false;
+    }
+
+    // 判斷目前是否允許查看這塊共用資料牌。
+    public bool CanOpenReferenceSign(GameObject signObject)
+    {
+        if (currentState != GameState.Exploring ||
+            signObject == null)
+        {
+            return false;
+        }
+
+        if (stageBMissionController != null &&
+            stageBMissionController.IsCurrentParentSign(signObject))
+        {
+            if (!IsStageB)
+            {
+                ShowSystemHint("這份資料目前尚未開放");
+                return false;
+            }
+
+            if (!stageBMissionController.CanObserveParents)
+            {
+                ShowSystemHint("請先查閱遺傳手冊");
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 }

@@ -5,52 +5,60 @@ using UnityEngine.Video;
 
 public class StoryVideoController : MonoBehaviour
 {
-    [Header("故事頁面")]
-
-
     [Header("影片")]
 
-    [Tooltip("放在 ComputerPanel 下獨立物件上的 VideoPlayer，不要隨故事頁停用。")]
+    [Tooltip("此影片專用的播放器。請放在不會隨分頁停用的物件上。")]
     public VideoPlayer videoPlayer;
 
-    [Tooltip("影片進度條。首次看完之前不可拖曳。")]
+    [Tooltip("此影片的進度條。首次完整觀看之前不可拖曳。")]
     public Slider videoProgressSlider;
 
-    [Tooltip("顯示目前時間與影片總長度的 TMP 文字。")]
+    [Tooltip("顯示片段的已播放時間與總長度。")]
     public TMP_Text videoTimeText;
 
-    [Tooltip("是否已真正完整觀看一次。只保留在本次遊戲，不會自動存檔。")]
+
+    [Header("播放範圍")]
+
+    [Tooltip("片段開始秒數。例如 00:41 填 41；從頭播放填 0。")]
+    [Min(0f)]
+    public float startTime = 0f;
+
+    [Tooltip("片段結束秒數。例如 04:19 填 259；填 0 代表播放到影片結尾。")]
+    [Min(0f)]
+    public float endTime = 0f;
+
+
+    [Header("觀看紀錄")]
+
+    [Tooltip("是否已完整觀看此片段。只保留在本次遊戲。")]
     [SerializeField]
-    private bool hasCompletedFirstViewing = false;
+    private bool hasCompletedFirstViewing;
 
-    // 對外統一查詢：已看完影片，或目前是測試模式。
-    public bool HasCompletedFirstViewing
-    {
-        get
-        {
-            return hasCompletedFirstViewing ||
-                   (gameManager != null && gameManager.IsTestMode);
-        }
-    }
-
-
-    // 記住目前影片位置，與首次觀看紀錄分開保存。
-    private double savedVideoTime;
-
-    // 影片準備完成後，是否需要開始播放。
-    private bool playWhenPrepared;
-
-    // 重播時，判斷目前是否停在影片結尾。
-    private bool endedAtLastFrame;
-
-    // 由電腦分頁控制器通知目前是否顯示影片頁。
-    private bool isVideoPageVisible;
 
     [Header("腳本")]
-    [Tooltip("整體流程控制器，用來判斷是否處於測試模式。")]public GameManager gameManager;
+
+    [Tooltip("用來讀取測試模式。測試模式可略過首次觀看限制。")]
+    public GameManager gameManager;
+
+
+    // 測試模式只暫時略過限制，不會直接寫入完成紀錄。
+    public bool HasCompletedFirstViewing =>
+        hasCompletedFirstViewing ||
+        (gameManager != null && gameManager.IsTestMode);
+
+    // 保存的是原始影片中的秒數。
+    private double savedVideoTime;
+
+    private bool isVideoPageVisible;
+    private bool wantsToPlay;
+    private bool isSeeking;
+    private bool endedAtSegmentEnd;
+
 
     private void Awake()
     {
+        savedVideoTime = startTime;
+
         if (videoPlayer != null)
         {
             videoPlayer.playOnAwake = false;
@@ -58,7 +66,9 @@ public class StoryVideoController : MonoBehaviour
             videoPlayer.playbackSpeed = 1f;
 
             videoPlayer.prepareCompleted += OnVideoPrepared;
+            videoPlayer.seekCompleted += OnSeekCompleted;
             videoPlayer.loopPointReached += OnVideoEnded;
+            videoPlayer.errorReceived += OnVideoError;
         }
 
         if (videoProgressSlider != null)
@@ -67,7 +77,6 @@ public class StoryVideoController : MonoBehaviour
             videoProgressSlider.maxValue = 1f;
             videoProgressSlider.wholeNumbers = false;
 
-            // 使用程式綁定，Inspector 不必再接事件。
             videoProgressSlider.onValueChanged.AddListener(
                 OnProgressChanged
             );
@@ -77,43 +86,55 @@ public class StoryVideoController : MonoBehaviour
 
     private void OnEnable()
     {
-        // 分頁由 ComputerInteractable 統一管理。
-        // 啟用時不自動播放。
         RefreshVideoUI();
     }
 
 
     private void OnDisable()
     {
-        isVideoPageVisible = false;
-        PauseVideo();
+        SetPageVisible(false);
     }
 
 
     private void Update()
     {
-        if (videoPlayer != null && videoPlayer.isPrepared)
+        if (videoPlayer != null &&
+            videoPlayer.isPrepared &&
+            !isSeeking &&
+            !endedAtSegmentEnd)
         {
-            // 首次觀看固定正常速度。
-            if (!HasCompletedFirstViewing)
-            {
-                videoPlayer.playbackSpeed = 1f;
-            }
+            // 不提供加速播放。
+            videoPlayer.playbackSpeed = 1f;
 
-            if (!endedAtLastFrame)
+            if (videoPlayer.isPlaying && IsVideoPageVisible())
             {
-                savedVideoTime =
-                    System.Math.Max(0d, videoPlayer.time);
+                savedVideoTime = System.Math.Max(
+                    GetStartTime(),
+                    videoPlayer.time
+                );
+
+                double end = GetEndTime();
+
+                if (end > GetStartTime() &&
+                    videoPlayer.time >= end)
+                {
+                    CompleteSegment();
+                }
             }
         }
 
         RefreshVideoUI();
     }
 
+
     public void PlayVideo()
     {
-        if (!IsVideoPageVisible() || videoPlayer == null)
+        if (!IsVideoPageVisible() ||
+            videoPlayer == null ||
+            wantsToPlay)
+        {
             return;
+        }
 
         if (videoPlayer.clip == null)
         {
@@ -121,69 +142,169 @@ public class StoryVideoController : MonoBehaviour
             return;
         }
 
-        if (videoPlayer.isPlaying)
+        if (GetDuration() <= 0d)
+        {
+            Debug.LogWarning(
+                "影片播放範圍無效，請確認開始與結束秒數。",
+                this
+            );
+
             return;
+        }
 
         videoPlayer.playbackSpeed = 1f;
 
-        if (endedAtLastFrame)
+        if (endedAtSegmentEnd)
         {
-            // 看完後再按播放，從頭重播。
-            videoPlayer.Stop();
-            savedVideoTime = 0d;
-            endedAtLastFrame = false;
+            savedVideoTime = GetStartTime();
+            endedAtSegmentEnd = false;
         }
 
-        if (videoPlayer.isPrepared)
+        wantsToPlay = true;
+
+        if (!videoPlayer.isPrepared)
         {
-            videoPlayer.Play();
-        }
-        else
-        {
-            // 等待影片準備完成才播放。
-            playWhenPrepared = true;
             videoPlayer.Prepare();
+            return;
+        }
+
+        // 定位尚未完成時，交由定位完成事件接續播放。
+        if (!isSeeking)
+        {
+            SeekToSavedTime();
         }
     }
 
 
     private void OnVideoPrepared(VideoPlayer source)
     {
-        // 準備期間若已切頁或暫停，就不開始播放。
-        if (!playWhenPrepared || !IsVideoPageVisible())
+        if (!wantsToPlay || !IsVideoPageVisible())
+        {
             return;
+        }
 
-        playWhenPrepared = false;
-        source.Play();
+        SeekToSavedTime();
+    }
+
+
+    private void SeekToSavedTime()
+    {
+        if (videoPlayer == null || !videoPlayer.isPrepared)
+        {
+            return;
+        }
+
+        if (!videoPlayer.canSetTime)
+        {
+            wantsToPlay = false;
+
+            Debug.LogError(
+                "此播放器無法調整時間，不能播放指定片段。",
+                this
+            );
+
+            return;
+        }
+
+        videoPlayer.Pause();
+
+        double latest = System.Math.Max(
+            GetStartTime(),
+            GetEndTime() - 0.1d
+        );
+
+        savedVideoTime = System.Math.Min(
+            System.Math.Max(GetStartTime(), savedVideoTime),
+            latest
+        );
+
+        // 已在指定位置附近時，直接接續播放。
+        if (System.Math.Abs(
+                videoPlayer.time - savedVideoTime) < 0.01d)
+        {
+            isSeeking = false;
+            ResumeIfRequested();
+            return;
+        }
+
+        isSeeking = true;
+        videoPlayer.time = savedVideoTime;
+    }
+
+
+    private void OnSeekCompleted(VideoPlayer source)
+    {
+        isSeeking = false;
+        ResumeIfRequested();
+    }
+
+
+    private void ResumeIfRequested()
+    {
+        if (wantsToPlay &&
+            IsVideoPageVisible() &&
+            videoPlayer != null)
+        {
+            videoPlayer.Play();
+        }
     }
 
 
     public void PauseVideo()
     {
-        playWhenPrepared = false;
+        wantsToPlay = false;
 
         if (videoPlayer == null || !videoPlayer.isPrepared)
-            return;
-
-        if (!endedAtLastFrame)
         {
-            savedVideoTime =
-                System.Math.Max(0d, videoPlayer.time);
+            return;
+        }
+
+        if (!isSeeking && !endedAtSegmentEnd)
+        {
+            savedVideoTime = System.Math.Max(
+                GetStartTime(),
+                videoPlayer.time
+            );
         }
 
         videoPlayer.Pause();
     }
 
 
-    private void OnVideoEnded(VideoPlayer source)
+    private void CompleteSegment()
     {
-        // 由自然播放到結尾的事件解鎖首次觀看。
+        if (videoPlayer != null)
+        {
+            videoPlayer.Pause();
+        }
+
+        savedVideoTime = GetEndTime();
+        endedAtSegmentEnd = true;
+        wantsToPlay = false;
+
         hasCompletedFirstViewing = true;
-        endedAtLastFrame = true;
-        playWhenPrepared = false;
-        savedVideoTime = GetDuration();
 
         RefreshVideoUI();
+    }
+
+
+    private void OnVideoEnded(VideoPlayer source)
+    {
+        // 整部影片自然結束時也視為完成。
+        // 提前結束的指定片段，則由 Update 判斷。
+        if (wantsToPlay && IsVideoPageVisible() && !isSeeking)
+        {
+            CompleteSegment();
+        }
+    }
+
+
+    private void OnVideoError(VideoPlayer source, string message)
+    {
+        wantsToPlay = false;
+        isSeeking = false;
+
+        Debug.LogError($"影片播放失敗：{message}", this);
     }
 
 
@@ -193,7 +314,8 @@ public class StoryVideoController : MonoBehaviour
             !IsVideoPageVisible() ||
             videoPlayer == null ||
             !videoPlayer.isPrepared ||
-            !videoPlayer.canSetTime)
+            !videoPlayer.canSetTime ||
+            isSeeking)
         {
             return;
         }
@@ -201,23 +323,35 @@ public class StoryVideoController : MonoBehaviour
         double duration = GetDuration();
 
         if (duration <= 0d)
+        {
             return;
+        }
 
-        // 留在最後一格之前，避免部分裝置無法定位至精確結尾。
-        double latestTime =
-            System.Math.Max(0d, duration - 0.1d);
+        // 記住拖曳前是否正在播放。
+        wantsToPlay = videoPlayer.isPlaying;
 
         savedVideoTime =
-            System.Math.Min(value * duration, latestTime);
+            GetStartTime() +
+            Mathf.Clamp01(value) * duration;
 
-        endedAtLastFrame = false;
-        videoPlayer.time = savedVideoTime;
+        endedAtSegmentEnd = false;
+        SeekToSavedTime();
+
+        RefreshVideoUI();
     }
 
 
     private void RefreshVideoUI()
     {
         double duration = GetDuration();
+
+        double elapsed = System.Math.Min(
+            duration,
+            System.Math.Max(
+                0d,
+                savedVideoTime - GetStartTime()
+            )
+        );
 
         if (videoProgressSlider != null)
         {
@@ -227,12 +361,12 @@ public class StoryVideoController : MonoBehaviour
                 videoPlayer != null &&
                 videoPlayer.isPrepared &&
                 videoPlayer.canSetTime &&
+                !isSeeking &&
                 duration > 0d;
 
-            // 更新顯示時不觸發跳轉事件。
             videoProgressSlider.SetValueWithoutNotify(
                 duration > 0d
-                    ? Mathf.Clamp01((float)(savedVideoTime / duration))
+                    ? (float)(elapsed / duration)
                     : 0f
             );
         }
@@ -240,33 +374,50 @@ public class StoryVideoController : MonoBehaviour
         if (videoTimeText != null)
         {
             videoTimeText.text =
-                $"{FormatTime(savedVideoTime)} / " +
-                $"{FormatTime(duration)}";
+                $"{FormatTime(elapsed)} / {FormatTime(duration)}";
         }
+    }
+
+
+    private double GetClipLength()
+    {
+        if (videoPlayer == null || videoPlayer.clip == null)
+        {
+            return 0d;
+        }
+
+        return videoPlayer.clip.length;
+    }
+
+
+    private double GetStartTime()
+    {
+        return System.Math.Max(0d, startTime);
+    }
+
+
+    private double GetEndTime()
+    {
+        double length = GetClipLength();
+
+        return endTime > 0f
+            ? System.Math.Min(endTime, length)
+            : length;
     }
 
 
     private double GetDuration()
     {
-        if (videoPlayer == null)
-            return 0d;
-
-        double duration = videoPlayer.clip != null
-            ? videoPlayer.clip.length
-            : videoPlayer.length;
-
-        return double.IsNaN(duration) ||
-               double.IsInfinity(duration) ||
-               duration < 0d
-            ? 0d
-            : duration;
+        return System.Math.Max(
+            0d,
+            GetEndTime() - GetStartTime()
+        );
     }
 
 
     private string FormatTime(double seconds)
     {
         int total = (int)System.Math.Max(0d, seconds);
-
         return $"{total / 60:00}:{total % 60:00}";
     }
 
@@ -276,58 +427,6 @@ public class StoryVideoController : MonoBehaviour
         return isActiveAndEnabled && isVideoPageVisible;
     }
 
-
-    // 只有真正關閉電腦時呼叫。
-    public void ResetAfterComputerClosed()
-    {
-        playWhenPrepared = false;
-
-        if (videoPlayer != null)
-            videoPlayer.Stop();
-
-        savedVideoTime = 0d;
-        endedAtLastFrame = false;
-
-        // 完整觀看紀錄保留，不必每次重新解鎖。
-        RefreshVideoUI();
-    }
-
-
-    private void OnDestroy()
-    {
-        if (videoPlayer != null)
-        {
-            videoPlayer.prepareCompleted -= OnVideoPrepared;
-            videoPlayer.loopPointReached -= OnVideoEnded;
-        }
-
-        if (videoProgressSlider != null)
-        {
-            videoProgressSlider.onValueChanged.RemoveListener(
-                OnProgressChanged
-            );
-        }
-    }
-
-    // ==========================================
-    // 快速開始：補齊影片觀看狀態
-    // ==========================================
-
-    public void CompleteViewingForQuickStart()
-    {
-        // 快速開始代表前面的教材已完成。
-        hasCompletedFirstViewing = true;
-
-        // 保留重新觀看的功能，播放位置從頭開始。
-        ResetAfterComputerClosed();
-
-        // 解鎖分頁與更新進度條狀態。
-        RefreshVideoUI();
-    }
-
-    // ==========================================
-    // 接收目前影片頁的顯示狀態
-    // ==========================================
 
     public void SetPageVisible(bool visible)
     {
@@ -339,5 +438,50 @@ public class StoryVideoController : MonoBehaviour
         }
 
         RefreshVideoUI();
+    }
+
+
+    public void ResetAfterComputerClosed()
+    {
+        wantsToPlay = false;
+        isSeeking = false;
+        isVideoPageVisible = false;
+
+        if (videoPlayer != null)
+        {
+            videoPlayer.Stop();
+        }
+
+        savedVideoTime = GetStartTime();
+        endedAtSegmentEnd = false;
+
+        // 保留完整觀看紀錄。
+        RefreshVideoUI();
+    }
+
+
+    public void CompleteViewingForQuickStart()
+    {
+        hasCompletedFirstViewing = true;
+        ResetAfterComputerClosed();
+    }
+
+
+    private void OnDestroy()
+    {
+        if (videoPlayer != null)
+        {
+            videoPlayer.prepareCompleted -= OnVideoPrepared;
+            videoPlayer.seekCompleted -= OnSeekCompleted;
+            videoPlayer.loopPointReached -= OnVideoEnded;
+            videoPlayer.errorReceived -= OnVideoError;
+        }
+
+        if (videoProgressSlider != null)
+        {
+            videoProgressSlider.onValueChanged.RemoveListener(
+                OnProgressChanged
+            );
+        }
     }
 }

@@ -323,10 +323,12 @@ public class PlayerClick : MonoBehaviour
                 // 電腦互動不能進入長按移動。
                 return false;
             }
+
             // ==================================
-            // 空種植區
+            // 子代資訊牌
             // ==================================
-            // 子代資訊牌優先於種植區判斷。
+
+            // 自動生成的子代牌子，沿用原本的資料。
             PeaInfoSign peaSign =
                 hit.collider.GetComponentInParent<PeaInfoSign>();
 
@@ -335,6 +337,33 @@ public class PlayerClick : MonoBehaviour
                 gameManager.TryOpenOffspringSign(peaSign);
                 return false;
             }
+
+
+            // ==================================
+            // 共用親代／資料牌：A、B 都使用
+            // ==================================
+
+            // 由溫室控制器沿父階層尋找已登錄的牌子。
+            // 必須放在 PlantingSpot 前面，避免牌子被當成種植區。
+            if (greenhouseController != null &&
+                greenhouseController.TryResolveSign(
+                    hit.collider.gameObject,
+                    out GameObject signObject))
+            {
+                gameManager.TryInteractGreenhouse(
+                    greenhouseController,
+                    signObject
+                );
+
+                // 即使距離不足或任務尚未開放，
+                // 也不繼續觸發外層種植區。
+                return false;
+            }
+            // ==================================
+            // 空種植區
+            // ==================================
+
+
             PlantingSpot plantingSpot =
                 hit.collider.GetComponentInParent<PlantingSpot>();
 
